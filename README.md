@@ -11,31 +11,45 @@ that could become a production replacement for the reference application.
 
 | Path | Purpose |
 |------|---------|
-| `Docs/` | Original client brief (`InitialPrompt_clonning.docx`) — do not edit |
-| `docs/` | **Living architecture documentation** — read this first every session |
+| `Docs/InitialPrompt_clonning.docx` | Original client brief — do not edit |
+| `Docs/*.md` | **Living architecture documentation** — read `Docs/PROGRESS.md` first every session |
 | `app/` | The Next.js application (App Router + Prisma + PostgreSQL) |
 
-## Documentation index (`docs/`)
+> Windows filesystem is case-insensitive, so `Docs/` holds both the brief and the docs.
+
+## Documentation index (`Docs/`)
 
 | File | What it holds |
 |------|---------------|
-| [`docs/PROGRESS.md`](docs/PROGRESS.md) | **Session log + what's done / what's next.** Start here. |
-| [`docs/DISCOVERY-LOG.md`](docs/DISCOVERY-LOG.md) | Raw notes from inspecting the reference app |
-| [`docs/INVENTORY.md`](docs/INVENTORY.md) | Complete module / page / action inventory |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System, frontend, backend, auth, authz architecture |
-| [`docs/DATABASE.md`](docs/DATABASE.md) | Entities, relationships, constraints, ER model |
-| [`docs/ROUTES.md`](docs/ROUTES.md) | Every implemented route (UI + API) |
-| [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) | Business workflows end-to-end |
-| [`docs/ASSUMPTIONS.md`](docs/ASSUMPTIONS.md) | Anything not verified against the reference app |
-| [`docs/MASTER-PROMPT.md`](docs/MASTER-PROMPT.md) | Refined enterprise replication prompt |
+| [`Docs/PROGRESS.md`](Docs/PROGRESS.md) | **Session log + what's done / what's next.** Start here. |
+| [`Docs/DISCOVERY-LOG.md`](Docs/DISCOVERY-LOG.md) | Raw notes from inspecting the reference app |
+| [`Docs/INVENTORY.md`](Docs/INVENTORY.md) | Complete module / page / action inventory |
+| [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | System, frontend, backend, auth, authz architecture |
+| [`Docs/DATABASE.md`](Docs/DATABASE.md) | Entities, relationships, constraints, ER model |
+| [`Docs/ROUTES.md`](Docs/ROUTES.md) | Every implemented route (UI + API) |
+| [`Docs/WORKFLOWS.md`](Docs/WORKFLOWS.md) | Business workflows end-to-end |
+| [`Docs/ASSUMPTIONS.md`](Docs/ASSUMPTIONS.md) | Anything not verified against the reference app |
+| [`Docs/MASTER-PROMPT.md`](Docs/MASTER-PROMPT.md) | Refined enterprise replication prompt |
 
 ## Tech stack
 
-- **Framework:** Next.js (App Router, TypeScript)
-- **ORM / DB:** Prisma + PostgreSQL
-- **Auth:** session-based (httpOnly cookies), server-side permission checks
-- **UI:** React + Tailwind CSS
-- **Testing:** Vitest (unit/integration) + Playwright (E2E workflows)
+- **Framework:** Next.js 16 (App Router, TypeScript, Turbopack)
+- **ORM / DB:** Prisma 6 + PostgreSQL (`bela_abms`)
+- **Auth:** JWT in httpOnly cookies (access 15m + rotating refresh 7d), bcrypt, server-side RBAC
+- **UI:** React 19 + Tailwind CSS 4 (accent `#00A8E8`, DM Sans — matched to reference)
+- **Testing:** Vitest (unit/integration) + Playwright (E2E workflows) — from Phase 5
+
+## Run it
+
+```bash
+cd app
+npm install
+npm run db:migrate     # apply Prisma migrations to bela_abms
+npm run db:seed        # reference permission/menu data + demo users
+npm run dev            # http://localhost:3000
+```
+
+Demo logins (dev only): `admin@bela.local` / `cashier@bela.local` — password `password123`.
 
 ## Ground rules (from the client brief)
 

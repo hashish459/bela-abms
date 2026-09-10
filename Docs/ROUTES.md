@@ -1,32 +1,47 @@
 # ROUTES
 
-Every implemented route. Keep in sync with the app. `A` = requires auth, `P:<key>` = permission.
+`A` = requires auth (proxy-guarded). `P:<key>` = permission module key checked server-side.
+Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }`.
 
-## UI routes
+## Implemented — UI
 
-| Route | Auth | Permission | Page | Notes |
-|-------|------|------------|------|-------|
-| `/login` | – | – | Login | |
-| `/logout` | A | – | (action) | |
-| `/reset-password` | – | – | Request reset | |
-| `/dashboard` | A | `dashboard.view` | Dashboard | _TBD widgets_ |
-| _module routes_ | | | | _added per module_ |
+| Route | Auth | Page | Notes |
+|-------|------|------|-------|
+| `/` | – | redirect | → `/dashboard` if session, else `/login` |
+| `/login` | – | `(auth)/login` | email+password; `?next=` return path |
+| `/dashboard` | A | `(app)/dashboard` | accessible-module overview (no fake KPIs yet) |
+| `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub for any nav route without a real page yet |
 
-## API routes
+## Implemented — API
 
-Envelope: `{ ok, data }` / `{ ok:false, error:{ code, message, details? } }`.
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | `/api/auth/login` | – | verify creds → issue access+refresh cookies, audit LOGIN, throttle |
+| POST | `/api/auth/logout` | A | revoke refresh token, clear cookies, audit LOGOUT |
+| POST | `/api/auth/refresh` | cookie | rotate refresh token → new pair |
+| GET | `/api/auth/me` | A | current user + company + active fiscal year + effective permissions |
+| GET | `/api/menu` | A | permission-filtered navigation tree |
 
-| Method | Path | Auth | Permission | Purpose |
-|--------|------|------|------------|---------|
-| POST | `/api/auth/login` | – | – | Create session |
-| POST | `/api/auth/logout` | A | – | Revoke session |
-| GET | `/api/auth/me` | A | – | Current user + permissions |
-| POST | `/api/auth/reset-password` | – | – | Start reset flow |
-| GET | `/api/menu` | A | – | Permission-filtered navigation tree |
-| _domain endpoints_ | | | | _added per module, grouped by domain_ |
+## Planned — API (per module, Phase 5) — grouped by domain
 
-## Route groups (Next.js)
+```
+/api/companies            /api/branches           /api/fiscal-years
+/api/users  /api/roles  /api/permissions          /api/settings/*  (tax, custom-fields, banks, …)
+/api/accounts (chart-of-accounts, grouping-heads)  /api/contacts    /api/cash-bank
+/api/inventory/categories  /api/inventory/units  /api/inventory/warehouses
+/api/inventory/products    /api/inventory/adjustments  /api/inventory/transfers  /api/inventory/stock
+/api/sales/quotations  /api/sales/orders  /api/sales/invoices  /api/sales/receipts  /api/sales/credit-notes
+/api/purchase/orders   /api/purchase/invoices  /api/purchase/payments  /api/purchase/debit-notes
+/api/vouchers          /api/ledger
+/api/budget/headings /api/budget/budgets /api/budget/allocations /api/budget/funds
+/api/tokens            /api/crm/*              /api/documents/*        /api/store/*
+/api/reports/<report-key>   (POST with filter body → data)
+```
 
-- `app/(auth)/*` — unauthenticated
-- `app/(app)/*` — wrapped by authenticated layout; `middleware.ts` redirects to `/login`
-- `app/api/*` — route handlers; each calls `requireSession()` / `requirePermission()`
+Every endpoint: Zod validation · `requireSession()` · `requirePermission(key, action)` ·
+`HttpError`→envelope · audit for mutations · `$transaction` for multi-entity writes.
+
+## Route groups (Next.js App Router)
+- `app/(auth)/*` — unauthenticated (login)
+- `app/(app)/*` — wrapped by `(app)/layout.tsx` → `getSession()` redirect + `AppShell`
+- `app/api/*` — route handlers; `src/proxy.ts` redirects unauthenticated `/dashboard/*` → `/login`

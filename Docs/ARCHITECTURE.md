@@ -1,87 +1,95 @@
 # ARCHITECTURE
 
-> Status: **draft skeleton** — sections marked _TBD_ are completed after discovery.
+## 0. Reference application (observed — what we are replicating)
 
-## 1. System architecture
+| Layer | Reference (`bela.nepalebilling.com`) | Our clone (`app/`) |
+|-------|--------------------------------------|--------------------|
+| Frontend | Next.js **Pages Router** SPA | Next.js 16 **App Router** (RSC) |
+| Backend | Separate **Django REST Framework** API at `bela.api.nepalebilling.com` (+ shared `api.nepalebilling.com`) | Next.js route handlers (`app/api/**`), layered service/repository |
+| DB | (not observable) PostgreSQL-class relational | PostgreSQL + Prisma |
+| Auth | **JWT** (SimpleJWT) — `access_token`/`refresh_token` cookies, JS-readable | JWT in **httpOnly** cookies, rotating refresh, server-side session load |
+| Multi-tenancy | Company (subdomain) → Branch; per-company API subdomain | `Company.subdomain` + `Branch`; single deployment, company scoping in queries |
+| i18n | Nepali fiscal year (BS), Nepali months, `Rs.` (NPR) | same domain model; BS↔AD handled in a date layer (later) |
+| Styling | Tailwind, accent `#00A8E8`, DM Sans, bg `#F0F0F0` | identical tokens in `globals.css` |
+
+## 1. System
 
 ```
-Browser (React / Next.js App Router)
-   │  httpOnly session cookie
+Browser (React / App Router)
+   │  httpOnly JWT cookies (abms_access 15m, abms_refresh 7d rotating)
    ▼
-Next.js server (Route Handlers + Server Components + middleware)
-   │  Prisma Client
+Next.js server  ── src/proxy.ts (edge guard for /dashboard/*)
+   ├─ Server Components: getSession() → user + company + permissions
+   ├─ Route handlers (app/api/**): requireSession + requirePermission
    ▼
-PostgreSQL
+Prisma ▶ PostgreSQL (bela_abms)
 ```
 
-- Single deployable Next.js app. API is `app/api/**` route handlers, grouped by domain.
-- All authorization and business calculation happen server-side.
-- Middleware guards authenticated route groups and refreshes session.
-
-## 2. Frontend architecture
+## 2. Frontend
 
 ```
 app/
-├── (marketing)/          public pages (optional, low priority)
-├── (auth)/               login, signup, reset-password
-├── (app)/                authenticated shell: layout with header + sidebar
-│   ├── dashboard/
-│   └── <module>/         one folder per module
-├── api/                  route handlers by domain
-components/               shared UI (design system)
-features/<module>/        module-specific components, hooks, client services
-lib/                      db, auth, rbac, audit, api-envelope, validation
-server/<module>/          services + repositories (server-only business logic)
+  (auth)/login              login page + client LoginForm (Suspense-wrapped)
+  (app)/layout.tsx          getSession→redirect, buildMenu, renders <AppShell>
+  (app)/dashboard/          dashboard + [...slug] catch-all stub
+  api/auth/{login,logout,refresh,me}/route.ts
+  api/menu/route.ts
+components/app-shell.tsx    sidebar (data-driven, recursive NavItem) + header + user menu
+lib/                        env, db, api(envelope+HttpError+handler), jwt, password,
+                            cookies, session(issue/rotate), auth(getSession/requireSession),
+                            rbac(getEffectivePermissions/can/requirePermission), menu(buildMenu),
+                            audit(writeAudit/clientIp)
+prisma/schema.prisma        platform models
+prisma/seed.ts              permission catalogue + menu tree + demo company/users
 ```
 
-- **Navigation is data-driven:** sidebar renders from the `menu` table via `/api/menu`,
-  filtered by the current user's permissions. No hard-coded menu.
-- Forms: React Hook Form + Zod schemas shared between client preview and server validation.
+- **Navigation is data-driven:** `MenuItem` table → `buildMenu(permissions)` filters nodes
+  (leaf hidden without `read` on its `permissionKey`; group hidden when no visible child) →
+  `/api/menu` and the server layout both use it. No hard-coded menu.
+- Forms (later): React Hook Form + Zod schema shared client preview / server validation.
 
-## 3. Backend architecture
+## 3. Backend
 
-- **Layers:** route handler (HTTP + auth gate) → service (business logic, transactions)
-  → repository (Prisma queries). Validators (Zod) at the boundary.
-- **API response envelope:** `{ ok: true, data }` or `{ ok: false, error: { code, message, details? } }`.
-- **Transactions:** any operation touching >1 entity uses `prisma.$transaction`.
-- **Audit:** `writeAudit({ userId, action, entity, entityId, meta })` called from services.
+- **Layers:** route handler (HTTP + `requireSession` + `requirePermission`) → service
+  (business logic, `prisma.$transaction`) → repository (Prisma queries). Zod at the edge.
+- **Envelope:** `lib/api.ts` `ok()` / `fail()` / `handler()` wrapper turns `HttpError` &
+  `ZodError` into clean responses; unexpected errors log server-side, return generic 500.
+- **Audit:** `writeAudit()` from services for LOGIN/LOGOUT/CREATE/UPDATE/DELETE/APPROVE/…
+- **Transactions:** any multi-entity operation (invoice = header + items + stock move +
+  ledger + audit) in one `$transaction`.
 
-## 4. Authentication
+## 4. Authentication (implemented)
 
-- Email + password. Passwords hashed with **argon2id** (or bcrypt cost ≥ 12).
-- Session: opaque random token in httpOnly + Secure + SameSite=Lax cookie; server-side
-  `session` table with expiry + rotation. Idle + absolute timeout.
-- Login rate-limited per IP + per account; generic error messages.
-- _Reference auth behavior (redirects, session length): TBD._
+- Email + password; bcrypt cost 12 (`lib/password.ts`).
+- `POST /api/auth/login` → `issueSession()` signs access (`jose`, HS256, 15m) + refresh
+  (7d, random `jti`), stores sha256(refresh) in `RefreshToken`, sets httpOnly+SameSite=Lax
+  cookies. `lastLoginAt` updated, `AuditLog` LOGIN, `LoginAttempt` recorded.
+- Throttle: ≥8 failed attempts / 15 min per email ⇒ 429.
+- `POST /api/auth/refresh`: verifies + looks up token, **revokes old**, issues new pair
+  (rotating). Reuse/revoked ⇒ cookies cleared.
+- `src/proxy.ts` verifies access JWT for `/dashboard/*`; redirects to `/login?next=`.
+- Production: set `COOKIE_SECURE=true`, strong `JWT_*_SECRET`.
 
-## 5. Authorization (RBAC)
+## 5. Authorization (implemented)
 
 ```
-User ─* UserRole *─ Role ─* RolePermission *─ Permission
-Permission.key = "<module>.<action>"   e.g. invoice.create, report.export
-Menu.permissionKey ─ gates sidebar visibility AND route access
+User ─UserRole─ Role ─RolePermission─ PermissionModule      (key = "<group>.<module>")
+                                       actions: create | read | update | delete
+User.userType == "ADMIN"  ⇒  wildcard (all actions on all modules)
 ```
 
-- `requirePermission(key)` helper used in every route handler and server action.
-- Navigation visibility and backend checks both derive from the same permission set.
-- Never trust role/permission/identity from the client.
+- `getEffectivePermissions(roleIds, isAdmin)` merges RolePermission rows → `PermissionSet`
+  (`{ "sales.sales_invoice": ["read","create"] }`).
+- `can(perms, key, action)` / `requirePermission(perms, key, action)` (throws 403).
+- Same `PermissionSet` drives **both** nav visibility and API authorization.
+- Roles are per-company; a user's roles are filtered to the active company in `getSession`.
 
-## 6. Data model
+## 6–8. Data model / workflows / cross-cutting
+See [`DATABASE.md`](DATABASE.md), [`WORKFLOWS.md`](WORKFLOWS.md).
+Config `.env` (see `.env.example`) · logging via `console` now, `pino` wired later ·
+migrations `prisma migrate` · tests Vitest + Playwright (Phase 5+).
 
-See [`DATABASE.md`](DATABASE.md).
-
-## 7. Important workflows
-
-See [`WORKFLOWS.md`](WORKFLOWS.md).
-
-## 8. Cross-cutting
-
-| Concern | Approach |
-|---------|----------|
-| Errors | Central error type → envelope; no stack traces to client; logged with request id |
-| Logging | Structured JSON (pino); request id per call |
-| Config | `.env` via `@t3-oss/env-nextjs` schema; no prod config in code |
-| Migrations | Prisma Migrate; checked into `app/prisma/migrations` |
-| Seeding | `app/prisma/seed.ts` — roles, permissions, menu, admin user (no real secrets) |
-| Testing | Vitest (services/validation), Playwright (auth, nav, CRUD, billing, authz) |
-| Security | See brief §23 — input validation, parameterized queries (Prisma), CSRF token on mutations, IDOR checks in repositories, rate limiting |
+## Implementation status
+✅ Foundation (auth, RBAC, data-driven nav, app shell, error envelope, audit, seed).
+⬜ Everything domain: Settings UI, Accounts, Inventory, Sales, Purchase, Vouchers, Reports,
+CRM, Budget, Token, Documents, Store Builder — see `PROGRESS.md` roadmap.

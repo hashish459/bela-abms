@@ -1,82 +1,87 @@
 # PROGRESS — session log & roadmap
 
-> **Read this first.** It is the hand-off document between working sessions.
-> Update it at the end of every session.
+> **Read this first.** Hand-off document between working sessions. Update at end of every session.
 
-## Current status: `PHASE 1 — DISCOVERY (in progress)`
+## Current status: `PHASE 3 — FOUNDATION (done)` → next: PHASE 1 deep discovery + PHASE 5 modules
 
-Development order (from the brief): INSPECT → ARCHITECTURE → FOUNDATION → CORE UI →
-MODULES → CROSS-MODULE WORKFLOWS → ENTERPRISE HARDENING → QA.
+Order (from brief): INSPECT → ARCHITECTURE → FOUNDATION → CORE UI → MODULES →
+CROSS-MODULE WORKFLOWS → ENTERPRISE HARDENING → QA.
+
+Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path). App in `app/`.
 
 ---
 
 ## Session log
 
 ### Session 1 — 2026-09-10
-- Read the client brief (`Docs/InitialPrompt_clonning.docx`).
-- Decisions locked with client:
-  - Stack: **Next.js (App Router, TS) + Prisma + PostgreSQL**, Tailwind, session auth.
-  - Session-1 deliverable: discovery + architecture docs + scaffold + auth/RBAC/navigation slice.
-  - Reference-app inspection: client logs in, Claude drives the browser (Claude may not type passwords).
-- Reference app: `https://bela.nepalebilling.com`
-  - Root domain serves the **marketing site** (Home / Features / Industries / Blog / API Docs / Pricing / Contact / FAQ).
-  - `/login`, `/signup`, `/reset-password` are the auth routes.
-  - Product = "Nepal E-Billing System": IRD-certified VAT billing + NFRS-based reporting,
-    invoicing & billing, fixed assets & inventory, real-time financial data & analysis,
-    NFRS reports (daily report, yearly analysis, P&L, cash flow).
-- Scaffolded `app/` with `create-next-app` (Next.js 16.3.4, React 19, Tailwind 4, TS, App Router, src-dir).
-- **BLOCKER FOUND:** parent folder name contains `&` → breaks `npx`, `npm run`, Next.js build,
-  Prisma CLI on Windows (cmd.exe treats `&` as a command separator; child processes get
-  truncated path `D:\next\...`). Client agreed to **rename the folder**.
-- Removed `app/node_modules` + `package-lock.json` for a clean reinstall after rename.
+- Read brief. Locked stack: **Next.js + Prisma + PostgreSQL**, session auth, Tailwind.
+- Built `Docs/` living-doc set + Next.js scaffold. Hit `&`-in-path blocker → folder rename.
+
+### Session 2 — 2026-09-10 (this session)
+- **Authenticated discovery of the reference app** (client logged in, Claude drove). Captured:
+  stack (Next.js Pages Router + **Django REST API** at `bela.api.nepalebilling.com`, **JWT**
+  auth, multi-company/branch, Nepali FY), design tokens (`#00A8E8` accent, DM Sans, `#F0F0F0`),
+  full 13-item nav tree, 15 permission groups / 76 modules, key module forms (Sales Invoice,
+  Purchase Invoice, Product, Journal Voucher, COA, Budget, Token), Reports catalogue (35+),
+  Settings (17 sub-pages), RBAC model. → `Docs/DISCOVERY-LOG.md` + `Docs/INVENTORY.md`.
+- **Built Phase 3 foundation** in `app/` (Next.js 16.3.4 / React 19 / Tailwind 4 / Prisma 6):
+  - Postgres DB `bela_abms` (local PG18). Prisma schema: 14 platform models. Migration
+    `20260910173254_init_platform` applied.
+  - **Seed** (`npm run db:seed`): 76 PermissionModules, full MenuItem tree, demo Company
+    "Bela Nepal" + Head Office branch + FY 2083-84, `Administrator` (system, all perms) +
+    `Cashier` (limited) roles, `admin@bela.local` / `cashier@bela.local` (pw `password123`).
+  - **Auth:** `POST /api/auth/login|logout|refresh`, `GET /api/auth/me`. JWT access (15m) +
+    rotating refresh (7d), both httpOnly+SameSite cookies. bcrypt(12). LoginAttempt throttle
+    (8/15min). AuditLog on login/logout.
+  - **RBAC:** `User→UserRole→Role→RolePermission→PermissionModule`; `getEffectivePermissions`,
+    `can()`, `requirePermission()`. ADMIN userType = wildcard.
+  - **Data-driven nav:** `GET /api/menu` returns permission-filtered tree via `lib/menu.ts`.
+    Verified: admin sees 13 groups / all children; cashier sees Dashboard + Sales(3) +
+    Inventory(1) + Accounts(1).
+  - **Proxy** (`src/proxy.ts`, Next 16 renamed middleware) guards `/dashboard/*`.
+  - **UI shell:** `(auth)/login` + `(app)/layout` with `components/app-shell.tsx` (sidebar,
+    header w/ FY chip + bell + user menu, responsive). `(app)/dashboard` (honest — lists
+    accessible module groups, no fake KPIs). `(app)/dashboard/[...slug]` catch-all = permission-
+    gated "not implemented" stub for wired-but-unbuilt routes.
+  - ✅ `tsc --noEmit`, `eslint src`, `next build` all pass.
 
 ### ⏭️ RESUME HERE (next session)
-1. Confirm folder was renamed (no `&`), e.g. `D:\Bela_Accounting_and_Business_Management_Sys`.
-2. `cd app && npm install` (re-add deps).
-3. Add: `prisma`, `@prisma/client`, `argon2`, `zod`, `@t3-oss/env-nextjs`, `pino`,
-   dev: `vitest`, `@playwright/test`, `tsx`.
-4. Build Phase 3 foundation: Prisma platform schema (User, Role, Permission, UserRole,
-   RolePermission, Session, Menu, AuditLog, LoginAttempt) → migration → seed →
-   session auth (login/logout/me) → `requirePermission` → `/api/menu` → sidebar shell.
-5. Then get client to log in to reference app for real discovery → fill `INVENTORY.md`.
-
-- **Still pending:** authenticated inspection of the reference app (client login required).
-
----
-
-## Roadmap / checklist
-
-### Phase 1 — Discovery
-- [ ] Log in to reference app
-- [ ] Capture app shell (header, sidebar, footer, breadcrumbs)
-- [ ] Full navigation tree (menu → submenu → page), with routes + icons
-- [ ] Per-module: pages, tables (columns/filters/sort/pagination), forms (fields/validation), actions
-- [ ] Dashboard: cards / KPIs / charts and how each is calculated
-- [ ] Billing/invoice workflow + exact calculation rules (subtotal, discount, tax, total, balance)
-- [ ] Inventory/stock-movement logic
-- [ ] Reports / print / export inventory
-- [ ] Roles & permissions visible to this account
-- [ ] Settings / configuration / user-management sections
-- [ ] Record everything in `INVENTORY.md` + `DISCOVERY-LOG.md`
-
-### Phase 2 — Architecture
-- [ ] `ARCHITECTURE.md`, `DATABASE.md` (ER model), `ROUTES.md`, `WORKFLOWS.md`, authorization model
-
-### Phase 3 — Foundation
-- [ ] Next.js project scaffold in `app/`
-- [ ] Prisma schema + first migration (users, roles, permissions, menu, audit_log)
-- [ ] Session auth (login / logout / session / protected routes / middleware)
-- [ ] RBAC: user → role → permission → module → action; server-side checks
-- [ ] Data-driven navigation (menu table → API → sidebar), permission-filtered
-- [ ] Error handling, logging, config, consistent API response envelope
-
-### Phase 4+ — Core UI & Modules
-- [ ] Layout / design system matched to reference
-- [ ] Modules one by one: UI → API → DB → validation → authz → tests
+- **Option A — deeper discovery** (recommended before heavy module work): log into reference,
+  capture per-form validation/modals/empty+error states, the Sales Invoice + Purchase Invoice
+  calculation math (VAT rate, inclusive/exclusive, discount scope), invoice-number format,
+  Contra/Stock-journal/Credit-note/Debit-note forms, each Report's filters+columns, Settings
+  sub-pages (Tax, Custom fields, Printing templates), and a lower-privilege role's nav diff.
+- **Option B — start modules** (Phase 5), in this order:
+  1. **Settings core:** Company Info, Fiscal Year, Tax rates, Users & Roles UI (matrix editor),
+     Custom fields, Banks. (Unblocks everything else.)
+  2. **Accounts:** Chart of Accounts (seed NFRS COA ~190 accounts), Contacts (customer/supplier),
+     Cash & Bank.
+  3. **Inventory:** Product Category, Units, Warehouse, Product, opening stock.
+  4. **Sales:** Quotation → Sales Order → Sales Invoice (+ server-side totals engine) → Receipt.
+  5. **Purchase:** Purchase Order → Purchase Invoice → Payment.
+  6. **Vouchers:** Journal / Contra / Stock Journal → GL.
+  7. **Reports:** Trial Balance, P&L, Balance Sheet, Stock Summary, VAT Return, Aging.
+  8. **CRM, Budget, Token, Documents, Store Builder.**
+- Each module: Prisma models → migration → Zod validators → service (tx) → `/api/<domain>`
+  routes (`requirePermission`) → UI page replacing the stub → Vitest + Playwright.
 
 ---
+
+## Environment / how to run
+```
+cd D:\Bela_ABMS\app
+# Postgres 18 local, DB "bela_abms", trust auth for user postgres (see .env)
+npm install
+npm run db:migrate      # apply migrations
+npm run db:seed         # reference data + demo users
+npm run dev             # http://localhost:3000  (login: admin@bela.local / password123)
+npm run typecheck && npx eslint src && npm run build
+```
 
 ## Open questions for the client
-- Which roles/users exist? Can we see a second (lower-privilege) role to map permission differences?
-- Is multi-branch / multi-organization (tenant) in scope for this account?
-- Target deployment environment (for `DEPLOYMENT.md` later)?
+- VAT: fixed 13% or configurable per product/tax-type? Inclusive or exclusive pricing?
+- Invoice number format & does it sync to IRD CBMS / need real-time validation?
+- Is the e-commerce **Store Builder** in scope for the clone, or back-office only first?
+- Multi-company: one company per deployment, or true multi-tenant with company switcher?
+- Can we get a second, lower-privilege user login to map permission-gated differences?
+- Chart of Accounts: use the reference's exact NFRS list? (can export from reference if so)

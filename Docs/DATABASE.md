@@ -1,74 +1,104 @@
 # DATABASE
 
-> Status: **draft skeleton.** Only the platform tables below are confirmed in scope for
-> session 1. Domain entities (customers, products, invoices, …) are added after discovery,
-> and only when the reference app actually supports them.
+PostgreSQL + Prisma. Schema file: `app/prisma/schema.prisma`.
+Migrations: `app/prisma/migrations/`. Seed: `app/prisma/seed.ts`.
 
 ## Conventions
-
-- `id` — cuid/uuid primary key.
-- Every business table: `createdAt`, `updatedAt`, `createdById`, `updatedById`, `deletedAt` (nullable, soft delete).
-- Money stored as integer minor units (paisa) or `Decimal(18,2)` — **decided in schema**, never `float`.
+- `id`: cuid PK.
+- Business tables: `createdAt`, `updatedAt`, `deletedAt?` (soft delete), and (where relevant)
+  `createdById` / `updatedById`.
+- Money: `Decimal(18,2)`; quantities `Decimal(18,3)`. **Never float.**
 - FKs indexed. Natural unique keys enforced at DB level.
-- Multi-tenant scoping column (`organizationId` / `branchId`) added if discovery shows it.
+- Tenant scoping: `companyId` (and often `branchId` / `fiscalYearId`) on domain tables.
 
-## Platform tables (session 1)
+---
 
-### `User`
-| field | type | notes |
-|-------|------|-------|
-| id | pk | |
-| email | string | unique, citext |
-| name | string | |
-| passwordHash | string | argon2id |
-| status | enum(ACTIVE, DISABLED) | |
-| lastLoginAt | datetime? | |
-| + audit/soft-delete columns | | |
+## Platform tables (migration `init_platform`, applied) — 14 models
 
-### `Role`
-`id, key (unique), name, description, isSystem (bool)`
+### Tenancy
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `Company` | `name`, `subdomain` (unique), `address`, `allowsBranchCreation` | multi-tenant root |
+| `Branch` | `companyId→Company`, `name`, `address`, `isActive` | unique(companyId,name) |
+| `FiscalYear` | `companyId`, `name` "2083-84", `startDate`, `endDate`, `active` | unique(companyId,name) |
 
-### `Permission`
-`id, key (unique, "<module>.<action>"), module, action, description`
+### Identity
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `User` | `firstName`, `lastName`, `email` (unique), `phone`, `passwordHash`, `userType`, `status` (ACTIVE/DISABLED/INVITED), `lastLoginAt` | `userType="ADMIN"` ⇒ permission wildcard |
+| `UserCompany` | `userId`, `companyId`, `isDefault` | unique(userId,companyId) |
 
-### `UserRole`  (join)
-`userId → User`, `roleId → Role`, unique(`userId`,`roleId`)
+### Roles & permissions  (reproduces Settings › User & Permissions matrix)
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `Role` | `companyId`, `name` (free text: Admin/Cashier/…), `isSystem` | unique(companyId,name); per-company |
+| `PermissionModule` | `groupKey`, `groupName`, `key` (unique, `"<group>.<module>"`), `label`, `order` | the 76 UI modules |
+| `RolePermission` | `roleId`, `moduleId`, `canCreate/canRead/canUpdate/canDelete` | unique(roleId,moduleId) |
+| `UserRole` | `userId`, `roleId` | unique(userId,roleId) |
 
-### `RolePermission`  (join)
-`roleId → Role`, `permissionId → Permission`, unique(`roleId`,`permissionId`)
+### Auth
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `RefreshToken` | `userId`, `tokenHash` (unique, sha256), `expiresAt`, `revokedAt?`, `ip`, `userAgent` | rotating; id = JWT `jti` |
+| `LoginAttempt` | `email`, `ip`, `success`, `createdAt` | brute-force throttle |
 
-### `Session`
-`id, userId → User, tokenHash (unique), createdAt, expiresAt, lastSeenAt, ip, userAgent, revokedAt?`
+### Navigation (data-driven)
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `MenuItem` | `parentId?→MenuItem`, `title`, `slug` (unique), `route?`, `icon?`, `order`, `isActive`, `isExternal`, `permissionKey?` | `permissionKey` → `PermissionModule.key`; null ⇒ always visible |
 
-### `Menu`
-`id, parentId → Menu?, title, slug (unique), route, icon, order, isActive, permissionKey?, moduleId?, isExternal`
-
-### `AuditLog`
-`id, userId → User?, action, entity, entityId?, meta (json), ip, createdAt`
-
-### `LoginAttempt`  (rate limiting / lockout)
-`id, email, ip, success (bool), createdAt`
-
-## ER diagram (platform)
+### Cross-cutting
+| Model | Key fields | Notes |
+|-------|-----------|-------|
+| `AuditLog` | `userId?`, `companyId?`, `action`, `entity?`, `entityId?`, `meta` (json), `ip`, `createdAt` | LOGIN/LOGOUT/CREATE/UPDATE/DELETE/… |
+| `Reminder` | `userId`, `companyId`, `title`, `description?`, `remindAt`, `status` | dashboard widget |
+| `Notification` | `userId`, `companyId`, `title`, `body?`, `readAt?` | header bell |
 
 ```mermaid
 erDiagram
+  Company ||--o{ Branch : has
+  Company ||--o{ FiscalYear : has
+  Company ||--o{ Role : owns
+  Company ||--o{ UserCompany : "" 
+  User ||--o{ UserCompany : "member of"
   User ||--o{ UserRole : has
-  Role ||--o{ UserRole : has
+  Role ||--o{ UserRole : ""
   Role ||--o{ RolePermission : grants
-  Permission ||--o{ RolePermission : in
-  User ||--o{ Session : owns
+  PermissionModule ||--o{ RolePermission : ""
+  User ||--o{ RefreshToken : owns
+  MenuItem ||--o{ MenuItem : parent
+  PermissionModule ||--o{ MenuItem : gates
   User ||--o{ AuditLog : actor
-  Menu ||--o{ Menu : parent
-  Permission ||--o{ Menu : gates
 ```
 
-## Domain entities (post-discovery — placeholder)
+---
 
-Candidate list from the brief, **to confirm against the reference app**:
-Organization, Branch, Customer, Supplier, Product, Category, Unit, Tax, PriceList,
-Invoice, InvoiceItem, Payment, Transaction / JournalEntry, ChartOfAccount,
-InventoryItem, StockMovement, FixedAsset, DepreciationEntry, Report definitions, Settings.
+## Domain entities — NOT YET MODELLED (added per module, Phase 5)
 
-Do **not** create these until observed. Record each in this file with full column list,
-FKs, unique constraints, indexes, and relationships when added.
+Confirmed to exist in the reference (see `INVENTORY.md` / `DISCOVERY-LOG.md`); model each
+with full columns, FKs, unique constraints, indexes when its module is built:
+
+- **Accounts:** `ChartOfAccount` (code, name, groupingHead, financialHeading, financial?,
+  current?, accountType Assets/Liability/Equity/Income/Expense, openingBalance, dr/cr),
+  `AccountGroupingHead`, `Contact` (customer/supplier, PAN, address, opening balance),
+  `CashBankAccount`, `Bank`, `PaymentQr`.
+- **Inventory:** `ProductCategory`, `Unit` (+ sub/tertiary conversions), `Warehouse`,
+  `Product` (kind Goods/Service/Expense, HSN, SKU, reorder pt, taxType, prices, attributes:
+  size/color/flavour/DFTQC/expiry), `Batch`, `StockMovement` (opening/purchase/sale/
+  adjustment/transfer/return), `WarehouseTransfer`, `InventoryAdjustment`.
+- **Sales:** `Quotation`, `ProformaInvoice`, `SalesOrder`, `SalesInvoice` + `SalesInvoiceItem`,
+  `Receipt`, `CreditNote`, `Chalani`, `Cheque`, `PrintingCostRegister`.
+- **Purchase:** `PurchaseOrder`, `PurchaseInvoice` + `PurchaseInvoiceItem` (excise/custom duty),
+  `Expense`, `DebitNote`, `SupplierPayment`, `GoodsReceived`, `Import`.
+- **Vouchers / GL:** `Voucher` (journal/contra/stock), `VoucherLine` (accountId, debit, credit,
+  narration), `LedgerEntry` / `GeneralLedger`.
+- **Budget:** `BudgetHeading` (parent, source Manual|COA, restricted?), `Budget`, `Allocation`,
+  `Fund`.
+- **Token:** `FuelToken` + `FuelTokenItem`.
+- **CRM:** `CrmClient`, `CrmPartner`, `FollowUp`, `CallLog`.
+- **Documents:** `DocumentFolder`, `DocumentFile`.
+- **Store Builder:** `StoreTheme`, `HeroSlider`, `OfferAd`, `Review`, `StoreOrder`.
+- **Settings:** `TaxRate`, `CustomField`, `CustomStatus`, `PrintingTemplate`, `BillFooter`,
+  `CompanyInfo`, `InvoiceSetting`, `BackupJob`.
+
+Rule: only add an entity once its behaviour is observed in the reference app.
