@@ -10,7 +10,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/` | – | redirect | → `/dashboard` if session, else `/login` |
 | `/login` | – | `(auth)/login` | email+password; `?next=` return path |
 | `/dashboard` | A | `(app)/dashboard` | accessible-module overview (no fake KPIs yet) |
-| `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub for any nav route without a real page yet |
+| `/dashboard/settings/company-info` | A · `settings.company_info` | Company Info | legal identity + IRD/CBMS fields (stubbed) |
+| `/dashboard/settings/fiscal-year` | A · `settings.fiscal_year` | Fiscal Year | BS label + AD dates, active flag |
+| `/dashboard/settings/tax` | A · `settings.tax` | Tax | rate list; system rows locked |
+| `/dashboard/settings/*` (other) | A | wrapped by `settings/layout.tsx` sub-nav | fall through to stub until built |
+| `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
 
@@ -21,6 +25,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/auth/refresh` | cookie | rotate refresh token → new pair |
 | GET | `/api/auth/me` | A | current user + company + active fiscal year + effective permissions |
 | GET | `/api/menu` | A | permission-filtered navigation tree |
+| GET/POST | `/api/settings/fiscal-years` | A · `settings.fiscal_year` view/create | list / create fiscal year (one active per company) |
+| PATCH | `/api/settings/fiscal-years/[id]` | A · `settings.fiscal_year` update | edit / set active |
+| GET/POST | `/api/settings/tax-rates` | A · `settings.tax` view/create | list / create tax rate |
+| PATCH/DELETE | `/api/settings/tax-rates/[id]` | A · `settings.tax` update/delete | edit / soft-delete (system rows locked) |
+| GET/PUT | `/api/settings/company-info` | A · `settings.company_info` view/update | company profile; CBMS password encrypted, never returned |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 

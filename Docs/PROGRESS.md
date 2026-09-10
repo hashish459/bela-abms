@@ -56,6 +56,21 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 - Still to capture (during each module build): POST payloads, exact VAT/discount math,
   invoice-number format, `/users/permissions/my/` shape, per-report columns.
 
+### Session 4 — 2026-09-11 (Module 1a — Settings: Fiscal Year + Tax + Company Info)
+- Prisma: `FiscalYear` (+description, isClosed, `@db.Date`), new `TaxRate`, new `CompanyInfo`.
+  Migration `20260910183808_settings_fiscalyear_tax_companyinfo`. Seed: 3 FYs, 3 system tax
+  rates (VAT 13% / Exempt / Non-Taxable), demo CompanyInfo.
+- `src/lib/bs-date.ts` — BS⇆AD via `nepali-date-converter` (store AD, display BS).
+- `src/lib/crypto.ts` — AES-256-GCM at-rest encryption (CBMS password). Needs `APP_SECRET`.
+- `src/server/settings/{schemas,service}.ts` — Zod + service layer (tx, audit, one-active-FY rule).
+- API: `/api/settings/fiscal-years[/id]`, `/api/settings/tax-rates[/id]`, `/api/settings/company-info`.
+- UI: `settings/layout.tsx` (permission-filtered sub-nav) + `components/ui.tsx` (Button, Card,
+  Field, Input, Toggle, Modal, toast, `api()` wrapper) + 3 pages (fiscal-year, tax, company-info).
+- Verified in browser + curl: CRUD works, validation (bad date range → 422), RBAC (cashier → 403),
+  CBMS password stored encrypted (`iv:tag:cipher`), never returned. tsc/eslint/build green.
+- **Not yet:** image uploads (logo/stamp/QR/signature), FY "Resync Opening" (needs GL), the
+  other 11 Settings sub-pages (still stubbed).
+
 ### Client decisions (2026-09-11)
 - **v1 scope:** Core accounting ERP **+ industry verticals** (Fixed Assets, Manufacturing/BOM,
   Workshop, Restaurant, Fuel/Token, Printing). **Out of v1:** CRM, Budget, Store Builder.
@@ -67,8 +82,9 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 ### ⏭️ RESUME HERE (next session) — begin Phase 5 modules
 Development proceeds **part by part** (client's instruction: one module per session, confirm each).
 Recommended order & why:
-  1. **Settings core:** Company Info (+ IRD/CBMS fields), Fiscal Year (BS⇆AD), Tax rates,
-     Users & Roles UI (permission-matrix editor), Custom fields, Banks. *Unblocks everything.*
+  1. **Settings core:** ✅ Fiscal Year (BS⇆AD) · ✅ Tax rates · ✅ Company Info (+ IRD/CBMS,
+     encrypted) — *done session 4*. ⬜ Users & Roles UI (permission-matrix editor) ·
+     ⬜ Custom Fields · ⬜ Banks · ⬜ Bill Footer · ⬜ Invoice Setting · ⬜ Backup.
   2. **Accounts / GL (the spine):** `AccountHead`/`AccountGroup`/`Ledger` 3-level COA +
      NFRS seed · `Voucher`/`VoucherLine` + **`postVoucher()`** service (ΣDr=ΣCr) ·
      Contacts (customer/supplier ledgers) · Cash & Bank. Everything financial posts here.

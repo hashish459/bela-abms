@@ -14,17 +14,19 @@ datasource db {
 /// ─────────────────────────────  TENANCY  ─────────────────────────────
 
 model Company {
-  id                    String   @id @default(cuid())
-  name                  String
-  subdomain             String   @unique
-  address               String?
-  allowsBranchCreation   Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  deletedAt             DateTime?
+  id                   String    @id @default(cuid())
+  name                 String
+  subdomain            String    @unique
+  address              String?
+  allowsBranchCreation Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
 
   branches      Branch[]
   fiscalYears   FiscalYear[]
+  taxRates      TaxRate[]
+  info          CompanyInfo?
   roles         Role[]
   userLinks     UserCompany[]
   auditLogs     AuditLog[]
@@ -33,13 +35,13 @@ model Company {
 }
 
 model Branch {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   companyId String
   name      String
   address   String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -49,13 +51,16 @@ model Branch {
 }
 
 model FiscalYear {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String   // e.g. "2083-84"
-  startDate DateTime // Gregorian equivalent of BS start
-  endDate   DateTime
-  active    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String // Bikram Sambat label, e.g. "2083-84"
+  startDate   DateTime @db.Date // stored as AD (Gregorian); UI shows BS
+  endDate     DateTime @db.Date
+  description String?
+  active      Boolean  @default(false)
+  isClosed    Boolean  @default(false) // year-end closed; opening carried forward
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -63,22 +68,77 @@ model FiscalYear {
   @@index([companyId])
 }
 
+/// Tax rates ("list published by IRD" in the reference). Nepal: VAT 13% + 0% exempt.
+model TaxRate {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String // "VAT 13%", "VAT Exempt", "Non-Taxable"
+  ratePct   Decimal   @db.Decimal(7, 4) // 13.0000
+  isNoTax   Boolean   @default(false) // "No Tax" flag — excludes from VAT base
+  isSystem  Boolean   @default(false) // seeded IRD rate; not deletable
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+/// One row per company: legal identity, IRD registration, branding assets.
+/// Mirrors Settings › Company Info in the reference.
+model CompanyInfo {
+  id        String @id @default(cuid())
+  companyId String @unique
+
+  legalName   String
+  displayName String?
+  phone       String
+  phone2      String?
+  email       String
+  website     String?
+  panNumber   String
+  eximCode    String?
+
+  // IRD Central Billing Monitoring System — integration is stubbed in v1 (ASSUMPTIONS A16).
+  cbmsUsername             String?
+  cbmsPasswordCiphertext   String? // encrypted at rest; never returned to the client
+  registeredWithVat        Boolean @default(true)
+  separatePurchaseSalesTax Boolean @default(false)
+  syncWithIrd              Boolean @default(false)
+
+  registeredAddress  String
+  registeredAddress2 String?
+
+  logoUrl      String?
+  stampUrl     String?
+  paymentQrUrl String?
+  signatureUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
 /// ─────────────────────────────  IDENTITY  ────────────────────────────
 
 /// Reference JWT carries user_type "AD" (Admin). Full option set not yet observed
 /// (Docs/ASSUMPTIONS.md A7). Kept as free string; ADMIN bypasses permission checks.
 model User {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   firstName    String
   lastName     String
-  email        String    @unique
+  email        String     @unique
   phone        String?
   passwordHash String
-  userType     String    @default("STAFF")
+  userType     String     @default("STAFF")
   status       UserStatus @default(ACTIVE)
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   deletedAt    DateTime?
 
   companyLinks  UserCompany[]
@@ -112,12 +172,12 @@ model UserCompany {
 
 /// Roles are per-company and free-text named (Admin, Cashier, Retailer, Storekeeper, …).
 model Role {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   companyId String
   name      String
-  isSystem  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSystem  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -173,14 +233,14 @@ model UserRole {
 /// ─────────────────────────────  AUTH  ───────────────────────────────
 
 model RefreshToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
   ip        String?
   userAgent String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -224,7 +284,7 @@ model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
   companyId String?
-  action    String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, …
+  action    String // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, …
   entity    String?
   entityId  String?
   meta      Json?

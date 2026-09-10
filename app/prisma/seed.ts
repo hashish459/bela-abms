@@ -267,13 +267,57 @@ async function seedDemoCompany(allPermKeys: string[]) {
     update: {},
   });
 
-  await db.fiscalYear.upsert({
-    where: { companyId_name: { companyId: company.id, name: "2083-84" } },
+  // Fiscal years mirror the reference (BS label + AD dates).
+  const fiscalYears = [
+    { name: "2081-82", startDate: "2024-07-16", endDate: "2025-07-15", active: false },
+    { name: "2082-83", startDate: "2025-07-17", endDate: "2026-07-16", active: false },
+    { name: "2083-84", startDate: "2026-07-17", endDate: "2027-07-16", active: true },
+  ];
+  for (const fy of fiscalYears) {
+    await db.fiscalYear.upsert({
+      where: { companyId_name: { companyId: company.id, name: fy.name } },
+      create: {
+        companyId: company.id, name: fy.name,
+        startDate: new Date(fy.startDate), endDate: new Date(fy.endDate), active: fy.active,
+      },
+      update: { active: fy.active },
+    });
+  }
+
+  // Tax rates — Nepal IRD standard set (system rows, not deletable).
+  const taxRates = [
+    { name: "VAT 13%", ratePct: "13.0000", isNoTax: false },
+    { name: "VAT Exempt (0%)", ratePct: "0.0000", isNoTax: true },
+    { name: "Non-Taxable", ratePct: "0.0000", isNoTax: true },
+  ];
+  for (const t of taxRates) {
+    await db.taxRate.upsert({
+      where: { companyId_name: { companyId: company.id, name: t.name } },
+      create: {
+        companyId: company.id, name: t.name, ratePct: t.ratePct,
+        isNoTax: t.isNoTax, isSystem: true, isActive: true,
+      },
+      update: { ratePct: t.ratePct, isNoTax: t.isNoTax, isSystem: true },
+    });
+  }
+
+  // Company profile (Settings › Company Info).
+  await db.companyInfo.upsert({
+    where: { companyId: company.id },
     create: {
-      companyId: company.id, name: "2083-84",
-      startDate: new Date("2026-07-17"), endDate: new Date("2027-07-16"), active: true,
+      companyId: company.id,
+      legalName: "Bela Nepal Industries (Demo)",
+      displayName: "Bela Nepal Industries",
+      phone: "9800000000",
+      email: "info@bela.local",
+      website: "https://belanepal.com.np",
+      panNumber: "600000000",
+      registeredWithVat: true,
+      separatePurchaseSalesTax: false,
+      syncWithIrd: false,
+      registeredAddress: "Chhauni-15, Kathmandu, Nepal",
     },
-    update: { active: true },
+    update: {},
   });
 
   // System "Administrator" role with full CRUD on every module.
