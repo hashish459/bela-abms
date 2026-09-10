@@ -120,7 +120,9 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | CRUD (domain module) | ✓ | ✅ ledgers, contacts, tax, fiscal years, vouchers |
 | Search / filters / pagination | ✓ | ◑ ledger search + voucher pagination; per-module later |
 | Reports / print / export | ✓ | ◑ Trial Balance (print); PDF/Excel + other reports later |
-| Inventory movement logic | ✓ | ⬜ |
+| Inventory movement logic | ✓ | ✅ `StockMovement` + `postStockMovement()` (on-hand = Σ moves); opening stock + adjustments; oversell blocked |
+| Products / Units / Warehouse / Category | ✓ | ✅ full CRUD + Add Product form (Goods/Services/Expense) |
+| Stock Summary report | ✓ | ✅ (on-hand, low-stock flag) |
 | Billing calculation engine | ✓ | ⬜ |
 | Responsive UI | ✓ | ✅ shell + modules |
 | Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |

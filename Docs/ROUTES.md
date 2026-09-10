@@ -19,6 +19,12 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
 | `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | (uses `voucher-workspace`, page pending) |
 | `/dashboard/reports/accounting/trial-balance` | A · `reports.accounting_reports` | Trial Balance | grouped, print |
+| `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
+| `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
+| `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
+| `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
+| `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
+| `/dashboard/reports/inventory/stock-summary` | A · `reports.inventory_reports` | Stock Summary | on-hand, low-stock flag |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
@@ -45,6 +51,16 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/accounts/vouchers/[id]` | A · `vouchers.journal_voucher` read | voucher detail with lines |
 | GET | `/api/reports/trial-balance` | A · `reports.accounting_reports` read | active FY; `?asOf=` |
 | GET | `/api/reports/ledger/[id]` | A · `reports.accounting_reports` read | running ledger statement |
+| GET/POST | `/api/inventory/categories` | A · `inventory.product_category` | list / create (self-nesting) |
+| PATCH/DELETE | `/api/inventory/categories/[id]` | A · `inventory.product_category` | edit / delete (blocked if in use) |
+| GET/POST | `/api/inventory/units` | A · `inventory.units_of_measurement` | list / create |
+| PATCH | `/api/inventory/units/[id]` | A · `inventory.units_of_measurement` update | edit |
+| GET/POST | `/api/inventory/warehouses` | A · `inventory.warehouse` | list / create (first = default) |
+| PATCH | `/api/inventory/warehouses/[id]` | A · `inventory.warehouse` update | edit |
+| GET/POST | `/api/inventory/products` | A · `inventory.product_item` | `?kind=GOODS\|SERVICE\|EXPENSE&search&page`; POST optionally posts OPENING stock |
+| GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
+| GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
+| GET | `/api/reports/stock-summary` | A · `reports.inventory_reports` read | on-hand per product (Σ movements) |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 

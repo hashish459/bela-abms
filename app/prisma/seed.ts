@@ -143,11 +143,11 @@ const MENU: MenuSeed[] = [
     children: [
       { title: "Product Category", route: "/dashboard/inventory/product-category", permissionKey: "inventory.product_category" },
       { title: "Products", route: "/dashboard/inventory/products", permissionKey: "inventory.product_item" },
-      { title: "Units of Measurement", route: "/dashboard/inventory/units", permissionKey: "inventory.units_of_measurement" },
+      { title: "Units of Measurement", route: "/dashboard/inventory/unit-measurement", permissionKey: "inventory.units_of_measurement" },
       { title: "Warehouse", route: "/dashboard/inventory/warehouse", permissionKey: "inventory.warehouse" },
       { title: "Warehouse Transfer", route: "/dashboard/inventory/warehouse-transfer", permissionKey: "inventory.warehouse_transfer" },
-      { title: "Inventory Adjustment", route: "/dashboard/inventory/adjustment", permissionKey: "inventory.inventory_adjustment" },
-      { title: "Inventory Transfer", route: "/dashboard/inventory/transfer", permissionKey: "inventory.inventory_transfer" },
+      { title: "Inventory Adjustment", route: "/dashboard/inventory/inventory-adjustment", permissionKey: "inventory.inventory_adjustment" },
+      { title: "Inventory Transfer", route: "/dashboard/inventory/inventory-transfer", permissionKey: "inventory.inventory_transfer" },
     ],
   },
   {
@@ -416,8 +416,39 @@ async function seedDemoCompany(allPermKeys: string[]) {
   });
 
   const coa = await seedChartOfAccounts(company.id);
+  const inv = await seedInventoryBasics(company.id);
 
-  return { company: company.name, branch: branch.name, coa };
+  return { company: company.name, branch: branch.name, coa, inv };
+}
+
+/** Seed default units of measurement + a default warehouse (mirrors the reference). */
+async function seedInventoryBasics(companyId: string) {
+  const units = [
+    { name: "Unit", shortName: "Unit", acceptFraction: false },
+    { name: "Pieces", shortName: "Pcs", acceptFraction: false },
+    { name: "Kilogram", shortName: "Kg", acceptFraction: true },
+    { name: "Gram", shortName: "Gm", acceptFraction: true },
+    { name: "Liter", shortName: "Lt", acceptFraction: true },
+    { name: "Mililiter", shortName: "Ml", acceptFraction: true },
+    { name: "Sack", shortName: "Sack", acceptFraction: true },
+    { name: "Carton", shortName: "Crt", acceptFraction: true },
+    { name: "Packet", shortName: "Pkg", acceptFraction: true },
+  ];
+  for (const u of units) {
+    await db.unit.upsert({
+      where: { companyId_name: { companyId, name: u.name } },
+      create: { companyId, ...u, isSystem: true },
+      update: { shortName: u.shortName, acceptFraction: u.acceptFraction, isSystem: true },
+    });
+  }
+
+  await db.warehouse.upsert({
+    where: { companyId_name: { companyId, name: "Default Warehouse" } },
+    create: { companyId, name: "Default Warehouse", isDefault: true, address: "Head Office" },
+    update: {},
+  });
+
+  return { units: units.length };
 }
 
 /** Seed the NFRS 3-level chart of accounts (AccountHead → AccountGroup → Ledger). */
@@ -492,6 +523,7 @@ async function main() {
   console.log(
     `NFRS chart of accounts: ${demo.coa.heads} heads, ${demo.coa.groups} groups, ${demo.coa.ledgers} ledgers.`,
   );
+  console.log(`Inventory: ${demo.inv.units} units + Default Warehouse.`);
   console.log("Demo logins (dev only): admin@bela.local / cashier@bela.local — password123");
 }
 

@@ -93,21 +93,19 @@ Our clone models each with full columns/FKs/indexes as its module is built; name
 Trial Balance / Ledger Statement compute **purely from `VoucherLine`** aggregation
 (`src/server/accounts/gl.ts`), never from source documents.
 
-### Inventory
+### Inventory — ✅ BUILT (session 6)
 | Reference | Clone | Notes |
 |---|---|---|
-| `category` | `ProductCategory` | self-ref `subCategory`, image, active |
-| `unit` | `Unit` | `name, shortName, acceptFraction, active` |
-| `product` | `Product` | `kind (GD/SR/EX), name, categoryId, hsnCode, sku, reorderPoint, unitId, subUnitId, unitConversion, tertiaryUnitId, tertiaryConversion, purchasePrice, sellingPrice, taxType(INCLUSIVE/EXCLUSIVE), nonTaxable, size, color, flavour, dftqcNo, madeImportedFrom, expiryDate` |
-| `product additional field` | `ProductAdditionalField` | serialised-item fields (Barcode, Engine/Chassis/Battery/Serial/IMEI No, Color, Reg No, MFG Year) — toggleable |
-| `batch` | `ProductBatch` | per-warehouse batch; line-item picker source |
-| `ware house` | `Warehouse` | `name, branchId` |
-| `ware house transfer` | `WarehouseTransfer` | inter-warehouse |
-| `branch inventory transfer` | `BranchInventoryTransfer` | inter-branch |
-| `inventory adjustment` | `InventoryAdjustment` | +/- with reason |
-| `material bill` | `MaterialBill` (BOM) | manufacturing bill of materials |
-| `manufacture demolish` | `ManufactureEntry` | production (assemble/disassemble) |
-| — (derived) | `StockMovement` | ledger of every qty change (opening/purchase/sale/adjust/transfer/return/manufacture); **current stock = Σ movements** |
+| `category` | **`ProductCategory`** ✅ | self-ref `parent` (`CategoryTree`), description, imageUrl, isActive |
+| `unit` | **`Unit`** ✅ | `name, shortName, acceptFraction, isSystem, isActive`. Seeded 9. |
+| `ware house` | **`Warehouse`** ✅ | `name, branchId?, address, phone, isDefault`. Seeded Default Warehouse. |
+| `product` | **`Product`** ✅ | `kind(ProductKind GOODS/SERVICE/EXPENSE), name, categoryId?, hsnCode, sku (unique/company), reorderPoint, unitId + subUnitId + subUnitConversion + tertiaryUnitId + tertiaryConversion, purchasePrice, sellingPrice, taxRateId?, taxBasis(ProductTaxBasis INCLUSIVE/EXCLUSIVE), isNonTaxable, size, color, flavour, dftqcNo, madeImportedFrom, expiryDate` |
+| `batch` | **`ProductBatch`** ✅ | `productId, warehouseId, batchNo, expiryDate` (modelled; UI later) |
+| `inventory adjustment` | **`InventoryAdjustment` + `InventoryAdjustmentLine`** ✅ | `number(ADJ-NNNNN), date, type(InventoryAdjustmentType), warehouseId, notes`. Lines: `productId, batchId?, qty (signed)`. Posts ADJUSTMENT_IN/OUT movements. |
+| — (derived) | **`StockMovement`** ✅ | `productId, warehouseId, batchId?, date, kind(StockMovementKind), qty (signed Decimal), unitCost, sourceType, sourceId`. **`postStockMovement()` is the single writer; on-hand = Σ qty.** |
+| `product additional field` | `ProductAdditionalField` (planned) | serialised-item fields |
+| `ware house transfer` / `branch inventory transfer` | `WarehouseTransfer` / `BranchInventoryTransfer` (planned) | inter-warehouse / inter-branch |
+| `material bill` / `manufacture demolish` | `MaterialBill` (BOM) / `ManufactureEntry` (planned) | manufacturing verticals |
 
 ### Sales
 `invoice` (`invoice_type=SA`) + `InvoiceItem` · `quotation` (QU) · `perfoma invoice` (PF) ·

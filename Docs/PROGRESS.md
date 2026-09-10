@@ -104,6 +104,31 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
   Confirmation pages still stubbed; ledger-picker shows group name a bit cramped; no
   voucher edit/delete UI (reverse only via API).
 
+### Session 6 — 2026-09-11 (Module 3 — Inventory)
+- Prisma: `ProductCategory` (self-nesting), `Unit`, `Warehouse`, `Product` (kind GOODS/SERVICE/
+  EXPENSE, 3-level units + conversions, `taxRateId` + `taxBasis` INCLUSIVE/EXCLUSIVE +
+  `isNonTaxable`, attributes size/color/flavour/dftqc/madeFrom/expiry), `ProductBatch`,
+  **`StockMovement`** (signed qty), `InventoryAdjustment` + lines. Migration `inventory`.
+  Seed: 9 units + Default Warehouse.
+- **`src/server/inventory/stock.ts` — the stock engine:**
+  - `postStockMovement(tx, …)` — THE single writer of stock qty. Signed per `kind` (IN adds,
+    OUT removes), rejects SERVICE/EXPENSE, blocks overselling unless `allowNegative`.
+  - `onHandQty()`, `stockSummary()`, `stockByWarehouse()` — on-hand = Σ movements, never a field.
+- `src/server/inventory/service.ts` — CRUD for category / unit / warehouse / product
+  (opening stock → OPENING StockMovement) + inventory adjustment (INCREASE/DECREASE/DAMAGE/
+  EXPIRY/RECOUNT/OPENING → posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`).
+- API: `/api/inventory/{categories,units,warehouses,products,adjustments}`,
+  `/api/reports/stock-summary`. Fixed seed menu routes (`unit-measurement`, `inventory-adjustment`,
+  `inventory-transfer`).
+- UI: Inventory section (`TabNav`) + Product Category + Units + Warehouse + Products
+  (Goods/Services/Expense tabs, live search, full Add Product form) + Inventory Adjustment
+  (line grid + `ProductPicker`) + Stock Summary report. `components/product-picker.tsx`.
+- **Verified via curl + browser:** product + opening stock (100), DAMAGE adjustment (−30 →
+  on hand 70), over-decrement blocked ("Not enough stock"). tsc + eslint + build green.
+- **Gaps:** stock write-offs don't yet post a GL valuation entry (Dr Loss / Cr Inventory) —
+  deferred to the COGS/inventory-valuation pass; Warehouse Transfer + Inventory Transfer pages
+  stubbed; no product edit UI (API only); batch tracking modelled but not surfaced.
+
 ### Vendor docs received (2026-09-11) — `Docs/vendor/`
 - `SOFTWARE-SPEC.txt`: stack = Next.js + Django + FastAPI + PostgreSQL + JWT + Docker + K8s +
   Prometheus/Grafana. User roles **Admin / Manager / Accountant / Customer**. 1000 concurrent,
@@ -130,8 +155,10 @@ Recommended order & why:
   2. **Accounts / GL (the spine):** ✅ 3-level NFRS COA + seed · ✅ `Voucher`/`VoucherLine` +
      `postVoucher()` (ΣDr=ΣCr) · ✅ Contacts · ✅ Journal/Contra voucher UI · ✅ Trial Balance
      — *done session 5*. ⬜ Cash & Bank page · ⬜ Balance Confirmation · ⬜ Vitest for GL.
-  3. **Inventory:** Category, Unit, Warehouse, Product (GD/SR/EX, 3-level units, tax type),
-     `StockMovement` ledger + `postStockMovement()`, opening stock.
+  3. **Inventory:** ✅ Category · ✅ Unit · ✅ Warehouse · ✅ Product (GOODS/SERVICE/EXPENSE,
+     3-level units, tax basis) · ✅ `StockMovement` + `postStockMovement()` · ✅ opening stock ·
+     ✅ Inventory Adjustment · ✅ Stock Summary — *done session 6*. ⬜ Warehouse/Inventory
+     Transfer pages · ⬜ GL valuation entry on write-offs · ⬜ product edit UI.
   4. **Sales:** Quotation → Sales Order → **Sales Invoice** (server totals engine W4 +
      `postVoucher` + `postStockMovement` + numbering) → Receipt → Credit Note.
   5. **Purchase:** Purchase Order → Purchase Invoice (excise/custom duty, input VAT) →
