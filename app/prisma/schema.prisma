@@ -43,6 +43,8 @@ model Company {
   productBatches       ProductBatch[]
   stockMovements       StockMovement[]
   inventoryAdjustments InventoryAdjustment[]
+  salesDocs            SalesDoc[]
+  receipts             Receipt[]
 }
 
 model Branch {
@@ -73,8 +75,10 @@ model FiscalYear {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vouchers Voucher[]
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vouchers  Voucher[]
+  salesDocs SalesDoc[]
+  receipts  Receipt[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -701,6 +705,146 @@ model InventoryAdjustmentLine {
   adjustment InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
 
   @@index([adjustmentId])
+}
+
+/// ───────────────────────────────  SALES  ────────────────────────────
+/// Unified sales document (mirrors the reference `/invoices/` with `invoice_type`).
+/// QUOTATION / SALES_ORDER are non-accounting drafts. INVOICE / CREDIT_NOTE post GL +
+/// stock and are IMMUTABLE once created (Docs/vendor/INVOICE-IMMUTABILITY.txt) —
+/// corrections happen only via a CREDIT_NOTE.
+
+enum SalesDocType {
+  QUOTATION
+  SALES_ORDER
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum SalesDocStatus {
+  DRAFT // quotation / sales order, not yet converted
+  OPEN // invoice with balance outstanding
+  PARTIALLY_PAID
+  PAID
+  CONVERTED // quotation/SO converted to the next stage
+  CANCELLED // credit-noted in full
+  RETURNED // partially credit-noted
+}
+
+enum PaymentMode {
+  CREDIT
+  CASH
+  BANK
+  CHEQUE
+  WALLET // eSewa / Khalti / POS
+}
+
+model SalesDoc {
+  id           String       @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  type         SalesDocType
+  number       String // "SA-2083/84-0001", "QU-…", "CN-…"
+  date         DateTime     @db.Date
+
+  // Party — either an existing customer ledger, or a walk-in cash-sale name.
+  customerLedgerId String?
+  customerName     String? // for cash sales / display snapshot
+  customerPan      String?
+
+  deliveryDate    DateTime?   @db.Date
+  creditDays      Int?
+  referenceNo     String?
+  paymentMode     PaymentMode @default(CREDIT)
+  paymentLedgerId String? // cash/bank ledger when not on credit
+  notes           String?
+
+  convertedFromId String? // quotation → sales order → invoice chain
+  reversesDocId   String? // credit note → the invoice it credits
+
+  // Server-authoritative money (Docs/WORKFLOWS.md W4). All Decimal(18,2).
+  subtotal          Decimal @default(0) @db.Decimal(18, 2) // Σ line gross (qty×rate)
+  lineDiscountTotal Decimal @default(0) @db.Decimal(18, 2)
+  invoiceDiscount   Decimal @default(0) @db.Decimal(18, 2) // header-level, on taxable base
+  nonTaxableTotal   Decimal @default(0) @db.Decimal(18, 2)
+  taxableTotal      Decimal @default(0) @db.Decimal(18, 2) // after all discounts, pre-VAT
+  vatAmount         Decimal @default(0) @db.Decimal(18, 2)
+  grandTotal        Decimal @default(0) @db.Decimal(18, 2)
+  amountPaid        Decimal @default(0) @db.Decimal(18, 2)
+
+  status        SalesDocStatus @default(DRAFT)
+  voucherId     String?        @unique // the GL voucher (INVOICE / CREDIT_NOTE only)
+  cogsVoucherId String?        @unique
+  createdById   String?
+  createdAt     DateTime       @default(now())
+
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  items      SalesDocItem[]
+  receipts   Receipt[]
+
+  @@unique([companyId, number])
+  @@index([companyId, type, date])
+  @@index([customerLedgerId])
+  @@index([convertedFromId])
+  @@index([reversesDocId])
+}
+
+model SalesDocItem {
+  id          String  @id @default(cuid())
+  docId       String
+  productId   String?
+  description String // snapshot of product name (products can't be deleted while used, but snapshot anyway)
+  hsCode      String?
+  batchId     String?
+  warehouseId String?
+
+  qty      Decimal @db.Decimal(18, 3)
+  rate     Decimal @db.Decimal(18, 4)
+  discount Decimal @default(0) @db.Decimal(18, 2) // per-line, absolute
+
+  taxRateId      String?
+  taxRatePct     Decimal @default(0) @db.Decimal(7, 4) // snapshot
+  isNonTaxable   Boolean @default(false)
+  priceInclusive Boolean @default(false)
+
+  // computed, stored for audit
+  grossAmount Decimal @db.Decimal(18, 2) // qty × rate
+  netAmount   Decimal @db.Decimal(18, 2) // gross − line discount (tax-exclusive base)
+  lineVat     Decimal @default(0) @db.Decimal(18, 2)
+  order       Int     @default(0)
+
+  doc SalesDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([productId])
+}
+
+model Receipt {
+  id           String   @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  number       String // "RC-2083/84-0001"
+  date         DateTime @db.Date
+
+  customerLedgerId String
+  paymentLedgerId  String // cash / bank ledger
+  againstDocId     String? // the invoice being paid (optional — can be on-account)
+  amount           Decimal     @db.Decimal(18, 2)
+  paymentMode      PaymentMode @default(CASH)
+  reference        String?
+  notes            String?
+
+  voucherId   String?  @unique
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  againstDoc SalesDoc?  @relation(fields: [againstDocId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+  @@index([customerLedgerId])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────

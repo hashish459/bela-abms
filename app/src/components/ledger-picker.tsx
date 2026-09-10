@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { inputClass } from "./ui";
 
 export type LedgerOption = {
@@ -30,6 +31,13 @@ export function LedgerPicker({
   const [options, setOptions] = useState<LedgerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !boxRef.current) return;
+    const r = boxRef.current.getBoundingClientRect();
+    setPos({ left: r.left, top: r.bottom + 4, width: Math.max(r.width, 240) });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,8 +82,13 @@ export function LedgerPicker({
         </span>
         <span className="text-xs text-muted">{value?.code}</span>
       </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-border bg-surface p-1 shadow-lg">
+      {open && pos &&
+        createPortal(
+        <div
+          className="fixed z-[60] rounded-lg border border-border bg-surface p-1 shadow-lg"
+          style={{ left: pos.left, top: pos.top, width: pos.width }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <input
             autoFocus
             value={search}
@@ -109,7 +122,8 @@ export function LedgerPicker({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

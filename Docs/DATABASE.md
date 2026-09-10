@@ -107,10 +107,18 @@ Trial Balance / Ledger Statement compute **purely from `VoucherLine`** aggregati
 | `ware house transfer` / `branch inventory transfer` | `WarehouseTransfer` / `BranchInventoryTransfer` (planned) | inter-warehouse / inter-branch |
 | `material bill` / `manufacture demolish` | `MaterialBill` (BOM) / `ManufactureEntry` (planned) | manufacturing verticals |
 
-### Sales
-`invoice` (`invoice_type=SA`) + `InvoiceItem` · `quotation` (QU) · `perfoma invoice` (PF) ·
-`sales order` (SO) · `chalani` (delivery note) · `cheque` · `printing cost register` ·
-`paper roll register` · Receipt (customer payment) · Credit Note (sales return).
+### Sales — ✅ BUILT (session 7)
+| Reference | Clone | Notes |
+|---|---|---|
+| `invoice` + `quotation` + `perfoma invoice` + `sales order` | **`SalesDoc` + `SalesDocItem`** ✅ | one model, `type` = QUOTATION/SALES_ORDER/INVOICE/CREDIT_NOTE. `number, date, customerLedgerId?, customerName, paymentMode(PaymentMode), paymentLedgerId?, creditDays, referenceNo, convertedFromId, reversesDocId, status(SalesDocStatus), voucherId, cogsVoucherId` + server totals (subtotal, invoiceDiscount, nonTaxableTotal, taxableTotal, vatAmount, grandTotal, amountPaid). **Immutable once created.** |
+| — | **`SalesDocItem`** ✅ | snapshot: `description, hsCode, qty, rate, discount, taxRateId?, taxRatePct, isNonTaxable, priceInclusive, grossAmount, netAmount, lineVat` |
+| Receipt | **`Receipt`** ✅ | `number, date, customerLedgerId, paymentLedgerId, againstDocId?, amount, paymentMode, voucherId` |
+| Credit Note | **`SalesDoc` type CREDIT_NOTE** ✅ | `reversesDocId` → the invoice |
+| `chalani` / `cheque` / `printing cost register` / `paper roll register` | (planned) | Sales sub-docs |
+
+**Totals engine:** `src/server/sales/calc.ts` (pure, unit-tested). **Posting:**
+`src/server/sales/service.ts` — every invoice/receipt/credit-note posts balanced GL via
+`postVoucher` + stock via `postStockMovement` + perpetual COGS at weighted-average cost.
 
 ### Purchase
 `purchase order` (PO) · `invoice` (`invoice_type=PU`) + items (excise/custom duty) ·

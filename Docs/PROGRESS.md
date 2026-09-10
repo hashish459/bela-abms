@@ -104,6 +104,40 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
   Confirmation pages still stubbed; ledger-picker shows group name a bit cramped; no
   voucher edit/delete UI (reverse only via API).
 
+### Session 7 — 2026-09-11 (Module 4 — Sales)
+- Prisma: unified `SalesDoc` (type QUOTATION/SALES_ORDER/INVOICE/CREDIT_NOTE) + `SalesDocItem`
+  + `Receipt`. Enums SalesDocType/Status, PaymentMode. `voucherId`/`cogsVoucherId` links.
+  Migration `sales`. Seed: added `COS-01-0100 Cost of Goods Sold` ledger.
+- **`src/server/sales/calc.ts` — the totals engine (PURE, 10 Vitest tests, all green):**
+  line net = qty×rate − line discount (tax-inclusive lines back the VAT out); header discount
+  reduces the taxable base only, apportioned pro-rata across taxable lines, VAT recomputed;
+  non-taxable lines untouched; grand = non-taxable + taxable + VAT. Rounds VAT to 2dp.
+- **`src/server/sales/service.ts`:**
+  - `createInvoice` — the core. In one tx: SalesDoc + items → stock OUT (goods) →
+    `postVoucher(SALES)` Dr customer/cash / Cr Sales / Cr VAT → **perpetual COGS**
+    (`weightedAverageCost` → Dr COGS / Cr Inventory) → cash sale also books a Receipt.
+    Gap-free number `SA-2083/84-0001`. **Immutable — no update/delete route exists.**
+  - `createReceipt` — Dr cash/bank / Cr customer; updates invoice amountPaid + status
+    (OPEN→PARTIALLY_PAID→PAID); rejects over-payment.
+  - `createCreditNote` — sales return. Stock back IN at current avg cost, reverse GL
+    (Dr Sales Return + Dr VAT / Cr customer), reverse COGS; caps at the invoice's remaining
+    value; flips invoice → RETURNED / CANCELLED.
+  - `createDraft` (quotation / sales order — no GL/stock), `convertDoc` (QU→SO→INVOICE).
+- `src/server/inventory/cost.ts` — `weightedAverageCost` = Σ(inbound qty×unitCost) ÷ Σ inbound qty.
+- API: `/api/sales/{calc,invoices[/id],quotations,orders,receipts,credit-notes,docs/[id]/convert}`.
+- UI: Sales section (TabNav) + Sales Invoice (list + full form) + Quotation/Sales Order
+  (`DraftWorkspace`, convert buttons) + Receipts + Credit Note (pick invoice → adjust return
+  qty). `components/{sales-line-editor,product-picker,ledger-picker}.tsx` — pickers now render
+  in a **portal** so dropdowns escape modal clipping.
+- **Verified (curl + browser):** credit invoice → Dr AR 2260 / Cr Sales 2000 / Cr VAT 260,
+  COGS Dr/Cr at weighted-avg cost; cash sale (status PAID, Dr Cash); receipt Rs 500 →
+  PARTIALLY_PAID, outstanding correct; credit note (return 3/10) → GL + stock + COGS reversed,
+  trial balance still ties; over-limit receipt & credit-note rejected; PATCH/DELETE on an
+  invoice → **405**. tsc + eslint + build + 10 calc tests green.
+- **Gaps:** invoice detail/print view (list only); Chalani/Cheque/Proforma/Receivable pages
+  stubbed; `vitest` DB-integration tests for the posting flow (verified manually); the "Convert
+  to Invoice" flow currently just navigates to the invoice tab (doesn't pre-fill the form yet).
+
 ### Session 6 — 2026-09-11 (Module 3 — Inventory)
 - Prisma: `ProductCategory` (self-nesting), `Unit`, `Warehouse`, `Product` (kind GOODS/SERVICE/
   EXPENSE, 3-level units + conversions, `taxRateId` + `taxBasis` INCLUSIVE/EXCLUSIVE +
@@ -159,8 +193,9 @@ Recommended order & why:
      3-level units, tax basis) · ✅ `StockMovement` + `postStockMovement()` · ✅ opening stock ·
      ✅ Inventory Adjustment · ✅ Stock Summary — *done session 6*. ⬜ Warehouse/Inventory
      Transfer pages · ⬜ GL valuation entry on write-offs · ⬜ product edit UI.
-  4. **Sales:** Quotation → Sales Order → **Sales Invoice** (server totals engine W4 +
-     `postVoucher` + `postStockMovement` + numbering) → Receipt → Credit Note.
+  4. **Sales:** ✅ Quotation → Sales Order → **Sales Invoice** (calc engine + `postVoucher` +
+     `postStockMovement` + perpetual COGS + numbering + immutable) → ✅ Receipt → ✅ Credit Note
+     — *done session 7*. ⬜ invoice detail/print · ⬜ Chalani/Cheque/Proforma.
   5. **Purchase:** Purchase Order → Purchase Invoice (excise/custom duty, input VAT) →
      Payment → Debit Note → Goods Received / Import.
   6. **Vouchers UI:** Journal / Contra / Stock Journal (thin UI over `postVoucher`).

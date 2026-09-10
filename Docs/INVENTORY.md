@@ -123,7 +123,11 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Inventory movement logic | ✓ | ✅ `StockMovement` + `postStockMovement()` (on-hand = Σ moves); opening stock + adjustments; oversell blocked |
 | Products / Units / Warehouse / Category | ✓ | ✅ full CRUD + Add Product form (Goods/Services/Expense) |
 | Stock Summary report | ✓ | ✅ (on-hand, low-stock flag) |
-| Billing calculation engine | ✓ | ⬜ |
+| Billing calculation engine | ✓ | ✅ `src/server/sales/calc.ts` — line/header discount, VAT 13%, inclusive/exclusive, pro-rata apportionment; 10 unit tests |
+| Sales Invoice (immutable + GL + stock + COGS) | ✓ | ✅ `SA-2083/84-0001`, Dr AR / Cr Sales / Cr VAT + perpetual COGS; 405 on edit/delete |
+| Quotation → Sales Order → Invoice | ✓ | ✅ drafts + convert |
+| Receipt / Credit Note | ✓ | ✅ receipt updates invoice status; credit note reverses GL+stock+COGS |
+| Perpetual inventory / COGS | (implied) | ✅ weighted-average cost on every sale |
 | Responsive UI | ✓ | ✅ shell + modules |
 | Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |
 

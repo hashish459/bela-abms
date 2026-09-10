@@ -505,6 +505,20 @@ async function seedChartOfAccounts(companyId: string) {
     ledgerCount++;
   }
 
+  // Perpetual-inventory Cost of Goods Sold ledger (the reference COA has no clean one).
+  const cosGroup = groupByCode.get("COS-01"); // Consumption Cost
+  if (cosGroup) {
+    await db.ledger.upsert({
+      where: { companyId_code: { companyId, code: "COS-01-0100" } },
+      create: {
+        companyId, code: "COS-01-0100", name: "Cost of Goods Sold",
+        accountGroupId: cosGroup, isSystem: true,
+      },
+      update: {},
+    });
+    ledgerCount++;
+  }
+
   return {
     heads: headByCode.size,
     groups: groupByCode.size,

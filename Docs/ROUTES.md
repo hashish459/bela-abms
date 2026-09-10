@@ -25,6 +25,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
 | `/dashboard/reports/inventory/stock-summary` | A · `reports.inventory_reports` | Stock Summary | on-hand, low-stock flag |
+| `/dashboard/sales/invoice` | A · `sales.sales_invoice` | Sales Invoice | list + form (immutability notice) |
+| `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
+| `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
+| `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
+| `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
@@ -61,6 +66,14 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
 | GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
 | GET | `/api/reports/stock-summary` | A · `reports.inventory_reports` read | on-hand per product (Σ movements) |
+| POST | `/api/sales/calc` | A · `sales.sales_invoice` read | preview totals (same engine as the write) |
+| GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **immutable, no PATCH/DELETE**) |
+| GET | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read | invoice detail with items + receipts |
+| GET/POST | `/api/sales/quotations` | A · `sales.quotation` | list / create (no GL/stock) |
+| GET/POST | `/api/sales/orders` | A · `sales.sales_order` | list / create (no GL/stock) |
+| POST | `/api/sales/docs/[id]/convert` | A · `sales.sales_invoice` create | quotation→order→invoice prefill |
+| GET/POST | `/api/sales/receipts` | A · `sales.receipt` | list / create (Dr cash / Cr customer; updates invoice status) |
+| GET/POST | `/api/sales/credit-notes` | A · `sales.credit_note` | list / create (stock IN + reverse GL + reverse COGS; capped at invoice value) |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 
