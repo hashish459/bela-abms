@@ -1,0 +1,4 @@
+Note on Software Setup
+Please be advised that Nepal Ebilling Software is designed as a cloud-based solution. As such, there is no setup file available for download or installation on local machines. All functionalities of the software are accessible through a web browser, ensuring that users can conveniently access the platform from anywhere with an internet connection. This cloud-based approach ensures seamless updates, high availability, and robust security for all users.
+
+

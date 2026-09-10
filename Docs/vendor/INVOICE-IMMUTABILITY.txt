@@ -1,0 +1,7 @@
+Measure implemented so that Invoice cannot be Edited or Deleted
+Immutable Records:  When a bill is created, it has been treated as an immutable record. Once stored in the system, its data fields has been set as read-only or constant.  In a database, we have use constraints to make certain fields immutable.
+Database Constraints:  We have utilize database constraints to prevent updates or deletions. For example, setting up the database to disallow UPDATE and DELETE operations on the rows corresponding to bills.
+Audit Trails:  Implemented an audit trail to track changes made to records. Even though users cannot directly edit or delete bills, the system has log any attempts or changes made for accountability.  Stored a history of changes, including timestamps and the user who made the change.
+User Permissions:  Implemented strict user permission controls, no users should have the privilege to edit or delete bills.
+
+

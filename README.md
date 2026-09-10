@@ -31,6 +31,7 @@ that could become a production replacement for the reference application.
 | [`Docs/WORKFLOWS.md`](Docs/WORKFLOWS.md) | Business workflows end-to-end |
 | [`Docs/ASSUMPTIONS.md`](Docs/ASSUMPTIONS.md) | Anything not verified against the reference app |
 | [`Docs/MASTER-PROMPT.md`](Docs/MASTER-PROMPT.md) | Refined enterprise replication prompt |
+| [`Docs/vendor/`](Docs/vendor/) | Vendor-supplied docs (User Manual, Software Spec, invoice-immutability note) — extracted from `user_manuals/*.pdf` |
 
 ## Tech stack
 

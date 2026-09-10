@@ -1,0 +1,79 @@
+NEPAL E-BILLING YOUR BILLING PARTNER
+User Manual
+
+Create an Organization
+In order to use Nepal E-Billing, your organization must be registered at Nepal-Ebilling. If your organization is not registered or doesn't have an account, you can complete the following easy steps to register with us.
+1. Go to nepalebilling.com in your web browser 2. Click on the "Get Started" button located at the centre of the screen. 3. You will be directed to the "Create New Account" page. Type in your valid email
+address, check domain availability, and other information and click on Sign Up.
+4. Our team will reach out to you as soon as possible and your account & Domain will be activated.
+5. You can now go to "Login" to continue using Nepal E-billing.
+
+Sales Invoice
+The Invoice or Sales Invoice is a document sent by a provider of a product or service to the purchaser that shows the items or services provided and the amount owed. In the Invoice, you can create a new invoice, view, edit, and print the Invoice.
+How to create a Sales Invoice?
+
+Create New Invoice
+1. In the Sales Module, Select Invoice. 2. Click on "+Add New" to create a new invoice. 3. Unique invoice numbers will be generated automatically. 4. Upon clicking the "Customer Name" field, a drop-down list will
+appear for the existing customers or you can even make sales on Cash. Select the desired customer name from the list or type in the name manually. If the desired customer name is not previously created, click on the "Add New" option and fill in the details to create the customer. When the customer name is selected, their PAN No. will be shown next to it or if Cash Account is selected a new field to input the customer name will appear. 5. In the "Reference" field, type in the code or information manually as you desire. You can also convert previously created quotations or sales orders by clicking on the search icon and selecting from the list.
+
+(In case of the Conversion of quotation or sales order to invoice, the reference code will be tracked automatically) 6. Select Payment mode (Cash, Credit or Bank Deposit) 7. Select the "Delivery Date" on which the products will be delivered to the customer. 8. Enter the Credit date limit in numeric format to determine when the due will be cleared (This will help us in the Invoice aging report) 9. Select the product/service from the list. If an item is previously not created, click on "Add New" to create a new item. If the item is used in the previously created quotation, sales order or invoice, the rate shall be displayed automatically. 10. Enter quantity, and rate and tax will be automatically applied if applicable. 11.You can provide notes to customers, reporting tags and custom fields. 12. Click on the "Save" icon.
+Options In Invoice
+
+When a selected invoice is opened, options can be used to print or convert to receipt the selected invoice.
+Convert to Receipt ­This option helps you convert the selected invoice into "Receipt".
+Preview/PDF/Print: For any document opened you can preview, print or save as PDF. Nepal Ebilling offers a pre-designed template for the user, however, you can design/change the templates from "Configuration" in "Printing Templates".
+Documents/Comments: You can add documents related to this sales invoice & add comments for future reference.
+Credit Note / Sales Return
+Credit notes are documents created by the seller to the buyer indicating cancellation/acceptance of the return of a certain product/service. A credit note gives you an important ability to cancel out an already issued invoice, either in full or in part and relieves
+the buyer from the obligation of payment.
+In Debit Notes, you can create, edit or delete debit notes for the previous sales invoice.
+Creating New Credit Note
+
+1. In the Sales Module, Select Credit Notes. 2. Click on "+Add New" to create a new debit note. 3. Chronological Credit Note number will be generated automatically. 4. Upon clicking the "Account Name" field, a drop-down list will appear
+for the existing suppliers. Select the desired supplier name from the list or type in the name manually. If the desired supplier name is not previously created. When the customer name is selected, their PAN No. will be shown next to it or if Cash Account is selected a new field to input the customer name will appear. 5. Select the "Date" from the pre-designed calendar by clicking on the calendar icon. 6. In the "Invoice Ref", you can click on the search icon to enable a drop-down list of purchase bills/expenses for the selected supplier or you can manually enter the reference for the transaction. 7. The list of products/services shall be automatically traced if invoice ref is selected from the previously created purchase bill/expenses entry along with information such as product/service, quantity, rate, tax and discount. If invoice ref. is entered manually, select the product/service from the drop-down list, and enter quantity, rate, tax rate and discount amount manually. (You can still change/edit the information even if the invoice ref. is selected from the previously created purchase bills/expenses) 8. You can select a payment mode like credit, cash or bank deposit. 9. In the "Note", provide the relevant information for the transaction. 10. Click on the "Save" icon.
+
+Options for Credit Notes
+When a selected Debit note is opened, you can view details about the debit note and print the selected debit note. Preview/PDF/Print: For any document opened you can preview, print or save as PDF. Nepal Ebilling offers a pre-designed template for the user, however, you can design/change the templates from "Configuration" in "Printing Templates". Documents/Comments: You can add documents related to this debit note & add comments for future reference.
+Purchase Invoice
+
+A purchase bill is a document received upon the successful purchase of a product/service. It contains details about the purchase such as the product, quantity, prices, taxes, credit terms, payment conditions, etc. In the Purchase Invoice, you can create a new purchase bill; view, edit and initiate payment to the Supplier.
+How to create a Purchase Invoice?
+1. In the Purchase module, select Purchase Invoice. 2. Click on "+Add New" to create a new purchase Invoice. (You can also
+convert the existing approved purchase order into a purchase Invoice by selecting the approved purchase order and clicking on "Convert to Invoice".) 3. A unique Purchase Invoice number will be generated automatically. 4. Upon clicking the "Supplier Name" field, a drop-down list will appear for the existing suppliers. Select the desired supplier name from the list or type in the name manually. If the desired supplier name is not previously created, click on the "Add New" option and fill in the details to create the supplier. 5. In the "Reference" field, type in the code or information manually as you desire or search and select the previously created purchase
+
+order by clicking on the search icon. (In case of the Conversion of the purchase order to purchase Invoice, the reference code will be tracked automatically). 6. Select the "Invoice Date" from the pre-designed calendar by clicking on the calendar icon. 7. Select the "Delivery Date" on which the products will be delivered to the customer. 8. Provide the "Suppliers Invoice Reference" as per the invoice received from the Supplier. 9. Select the product/service from the list. Enter quantity, and rate, and select the tax rate and discount amount. click on the delete icon to remove the product from the list. (In case of the conversion of the Purchase Order, this information such as rate, tax, discount amount, etc. will be displayed automatically as per the purchase order. However, you can still alter the details to match the invoice from the supplier). 10. Enter Excise Duty and Custom Duty on every product if applicable. 11.Enter the Credit date limit in numeric format to determine when the due will be cleared (This will help us in the Invoice aging report) 12. You can provide notes for future reference. 13. Click on the "Save" icon.
+Options In Purchase Invoice
+
+When a selected purchase invoice is opened, you can view details about the invoice and print the selected invoice.
+Preview/PDF/Print: For any document opened you can preview, print or save as PDF. Nepal Ebilling offers a pre-designed template for the user, however, you can design/change the templates from "Configuration" in "Printing Templates".
+Documents/Comments: You can add documents related to this purchase invoice & add comments for future reference.
+Debit Notes / Purchase Return
+Debit notes are the documents created by the buyer to the supplier indicating the cancellation/return of a certain product/service. Debit note also denotes the reduction in payment obligation towards the supplier previously booked by the buyer.
+In Debit Notes, you can create, edit or delete debit notes for the previous purchase invoice.
+Creating New Debit Notes
+
+11. In the Purchase Module, Select Debit Notes. 12. Click on "+Add New" to create a new debit note. 13. Chronological Debit Note number will be generated automatically. 14. Upon clicking the "Supplier Name" field, a drop-down list will
+appear for the existing suppliers. Select the desired supplier name from the list or type in the name manually. If the desired supplier name is not previously created, click on the "Add New" option and fill in the details to create the supplier. 15. Select the "Date" from the pre-designed calendar by clicking on the calendar icon. 16. In the "Invoice Ref", you can click on the search icon to enable a drop-down list of purchase bills/expenses for the selected supplier or you can manually enter the reference for the transaction. 17. The list of products/services shall be automatically traced if invoice ref is selected from the previously created purchase bill/expenses entry along with information such as product/service, quantity, rate, tax and discount. If invoice ref. is entered manually, select the product/service from the drop-down list, and enter quantity,
+
+rate, tax rate and discount amount manually. (You can still change/edit the information even if the invoice ref. is selected from the previously created purchase bills/expenses) 18. In the "Note", provide the relevant information for the transaction. 19. Click on the "Save" icon.
+Options for Debit Notes
+When a selected Debit note is opened, you can view details about the debit note and print the selected debit note. Preview/PDF/Print: For any document opened you can preview, print or save as PDF. Nepal Ebilling offers a pre-designed template for the user, however, you can design/change the templates from "Configuration" in "Printing Templates". Documents/Comments: You can add documents related to this debit note & add comments for future reference.
+
+Sales Report
+A sales report is an analytical tool that provides information on the performance of various sales activities within a company. In Nepal E-billing, you can generate sales reports based on the value, quantity, location, customer, etc. using various filter tools.
+View Sales Report
+1. Click on the Report module
+
+2. Click on the sales report.
+3. At first sales report from the start of the fiscal year appears, you can filter it as per date.
+4. You can even export it in Excel format or Print the report for future reference.
+
+NEPAL E-BILLING YOUR BILLING PARTNER
+
+GET IN TOUCH
++977 9802359175 +977 9802359174
+
+info@nepalebilling.com www.nepalebilling.com
+Dhapasi Height, Basundhara, Kathmandu, Nepal
+
+

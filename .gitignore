@@ -30,3 +30,6 @@ Thumbs.db
 # temp
 Docs/~$*.docx
 scratchpad/
+
+# vendor PDFs are large binaries; keep the source but extracted text lives in Docs/vendor/
+user_manuals/*.jpeg

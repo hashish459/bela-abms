@@ -104,6 +104,15 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
   Confirmation pages still stubbed; ledger-picker shows group name a bit cramped; no
   voucher edit/delete UI (reverse only via API).
 
+### Vendor docs received (2026-09-11) — `Docs/vendor/`
+- `SOFTWARE-SPEC.txt`: stack = Next.js + Django + FastAPI + PostgreSQL + JWT + Docker + K8s +
+  Prometheus/Grafana. User roles **Admin / Manager / Accountant / Customer**. 1000 concurrent,
+  <2s. Reports: Sales/Sales Return/Purchase/Purchase Return/payments/customer.
+- `INVOICE-IMMUTABILITY.txt`: invoices are **immutable** — DB blocks UPDATE/DELETE, no user has
+  edit/delete rights, all attempts audited. Corrections via Credit/Debit Note only.
+- `USER-MANUAL.txt`: step-by-step for Sales Invoice, Credit Note, Purchase Invoice, Debit Note,
+  Sales Report — read before building the Sales/Purchase modules.
+
 ### Client decisions (2026-09-11)
 - **v1 scope:** Core accounting ERP **+ industry verticals** (Fixed Assets, Manufacturing/BOM,
   Workshop, Restaurant, Fuel/Token, Printing). **Out of v1:** CRM, Budget, Store Builder.
