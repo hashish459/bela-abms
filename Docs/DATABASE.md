@@ -79,16 +79,19 @@ Extracted from `GET /users/group/` (`content_type` values) + endpoint inspection
 see `Docs/REFERENCE-API-MAP.md`. This is the **source of truth for the domain model**.
 Our clone models each with full columns/FKs/indexes as its module is built; names are ours.
 
-### Accounting core (double-entry GL)
-| Reference model | Clone model (planned) | Notes |
+### Accounting core (double-entry GL) — ✅ BUILT (session 5)
+| Reference model | Clone model | Notes |
 |---|---|---|
-| `account head` | `AccountHead` | NFRS L1. `name, code, accountType(AS/LI/EQ/IN/EX), currentType(CU/NC/O), financialType(FI/NF/O), reserved, active` |
-| `group head` | `AccountGroup` | NFRS L2. `name, code (HEAD-NN), accountHeadId, reserved, active` |
-| `general ledger` | `Ledger` | L3 posting account. `name, code (HEAD-NN-NNNN), groupId, openingBalance, balanceType(DR/CR)` + party fields (`pan, phone, email, address, houseNumber, customerType, creditLimit, iecNo, gstin, bankName, bankAccountNo`) when it is a customer/supplier |
-| `voucher` | `Voucher` + `VoucherLine` | journal/contra/stock; lines = `ledgerId, debit, credit, narration`; must balance |
-| `slip` | (= Voucher; `/slips/` `slip_type` JO/CO/ST) | |
-| `bank information` | `Bank` | master list of Nepali banks |
-| `bank detail` | `CompanyBankAccount` | company's own bank accounts (for bill print) |
+| `account head` | **`AccountHead`** ✅ | NFRS L1. `code, name, accountType(AccountType), currentType(CurrentType), financialType(FinancialType), isSystem, isActive`. Seeded: 36 heads. |
+| `group head` | **`AccountGroup`** ✅ | NFRS L2. `code (HEAD-NN), name, accountHeadId, isSystem`. Seeded: 106 groups. |
+| `general ledger` | **`Ledger`** ✅ | L3 posting account. `code (HEAD-NN-NNNN), name, accountGroupId, openingBalance(Decimal), openingType(DR/CR), isSystem, isActive` + party fields (`contactKind, panNumber, phone, email, address, creditLimit, iecNo, gstin, bankName, bankAccount`) when it is a customer/supplier. Seeded: 181 NFRS ledgers + `Opening Balance Adjustment` suspense. |
+| `voucher` / `slip` | **`Voucher` + `VoucherLine`** ✅ | `number, date, type(VoucherType: OPENING/JOURNAL/CONTRA/STOCK/SALES/PURCHASE/RECEIPT/PAYMENT/CREDIT_NOTE/DEBIT_NOTE/EXPENSE), fiscalYearId, narration, sourceType, sourceId, createdById`. Lines: `ledgerId, debit, credit, narration, order`. **All GL writes go through `postVoucher()` — Σdebit = Σcredit enforced.** Opening balances post an OPENING voucher vs the suspense account. |
+| — | **`NumberSequence`** ✅ | gap-free per `(companyId, fiscalYearId, key)` — used for voucher numbers, will serve invoices too |
+| `bank information` | `Bank` (planned) | master list of Nepali banks |
+| `bank detail` | `CompanyBankAccount` (planned) | company's own bank accounts (for bill print) |
+
+Trial Balance / Ledger Statement compute **purely from `VoucherLine`** aggregation
+(`src/server/accounts/gl.ts`), never from source documents.
 
 ### Inventory
 | Reference | Clone | Notes |

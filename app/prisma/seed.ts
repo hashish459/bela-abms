@@ -6,6 +6,11 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import {
+  NFRS_ACCOUNT_HEADS,
+  NFRS_GROUPS,
+  NFRS_LEDGERS,
+} from "./data/nfrs-coa";
 
 const db = new PrismaClient();
 
@@ -410,7 +415,70 @@ async function seedDemoCompany(allPermKeys: string[]) {
     update: {},
   });
 
-  return { company: company.name, branch: branch.name };
+  const coa = await seedChartOfAccounts(company.id);
+
+  return { company: company.name, branch: branch.name, coa };
+}
+
+/** Seed the NFRS 3-level chart of accounts (AccountHead → AccountGroup → Ledger). */
+async function seedChartOfAccounts(companyId: string) {
+  const headByCode = new Map<string, string>();
+  for (const h of NFRS_ACCOUNT_HEADS) {
+    const row = await db.accountHead.upsert({
+      where: { companyId_code: { companyId, code: h.code } },
+      create: {
+        companyId, code: h.code, name: h.name,
+        accountType: h.accountType, currentType: h.currentType,
+        financialType: h.financialType, isSystem: true,
+      },
+      update: { name: h.name, accountType: h.accountType, currentType: h.currentType, financialType: h.financialType },
+    });
+    headByCode.set(h.code, row.id);
+  }
+
+  const groupByCode = new Map<string, string>();
+  for (const g of NFRS_GROUPS) {
+    const headId = headByCode.get(g.headCode);
+    if (!headId) continue;
+    const row = await db.accountGroup.upsert({
+      where: { companyId_code: { companyId, code: g.code } },
+      create: { companyId, code: g.code, name: g.name, accountHeadId: headId, isSystem: true },
+      update: { name: g.name, accountHeadId: headId },
+    });
+    groupByCode.set(g.code, row.id);
+  }
+
+  let ledgerCount = 0;
+  for (const l of NFRS_LEDGERS) {
+    const groupId = groupByCode.get(l.groupCode);
+    if (!groupId) continue;
+    await db.ledger.upsert({
+      where: { companyId_code: { companyId, code: l.code } },
+      create: { companyId, code: l.code, name: l.name, accountGroupId: groupId, isSystem: true },
+      update: { name: l.name, accountGroupId: groupId },
+    });
+    ledgerCount++;
+  }
+
+  // Suspense account so opening balances always post a balanced OPENING voucher.
+  const rsGroup = groupByCode.get("R&S-02"); // Reserve & Surplus / P&L group
+  if (rsGroup) {
+    await db.ledger.upsert({
+      where: { companyId_code: { companyId, code: "R&S-02-0002" } },
+      create: {
+        companyId, code: "R&S-02-0002", name: "Opening Balance Adjustment",
+        accountGroupId: rsGroup, isSystem: true,
+      },
+      update: {},
+    });
+    ledgerCount++;
+  }
+
+  return {
+    heads: headByCode.size,
+    groups: groupByCode.size,
+    ledgers: ledgerCount,
+  };
 }
 
 async function main() {
@@ -420,6 +488,9 @@ async function main() {
   console.log(
     `Seeded ${permKeys.length} permission modules, menu tree, and demo company ` +
       `"${demo.company}" / branch "${demo.branch}".`,
+  );
+  console.log(
+    `NFRS chart of accounts: ${demo.coa.heads} heads, ${demo.coa.groups} groups, ${demo.coa.ledgers} ledgers.`,
   );
   console.log("Demo logins (dev only): admin@bela.local / cashier@bela.local — password123");
 }

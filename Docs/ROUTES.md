@@ -14,6 +14,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/fiscal-year` | A · `settings.fiscal_year` | Fiscal Year | BS label + AD dates, active flag |
 | `/dashboard/settings/tax` | A · `settings.tax` | Tax | rate list; system rows locked |
 | `/dashboard/settings/*` (other) | A | wrapped by `settings/layout.tsx` sub-nav | fall through to stub until built |
+| `/dashboard/accounts/charts-of-accounts` | A · `accounts.charts_of_accounts` | Chart of Accounts | collapsible AS/LI/EQ/IN/EX tree + Add Account |
+| `/dashboard/accounts/contacts` | A · `accounts.contacts` | Contacts | Customers / Suppliers tabs + contact form |
+| `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
+| `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | (uses `voucher-workspace`, page pending) |
+| `/dashboard/reports/accounting/trial-balance` | A · `reports.accounting_reports` | Trial Balance | grouped, print |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
@@ -30,6 +35,16 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/settings/tax-rates` | A · `settings.tax` view/create | list / create tax rate |
 | PATCH/DELETE | `/api/settings/tax-rates/[id]` | A · `settings.tax` update/delete | edit / soft-delete (system rows locked) |
 | GET/PUT | `/api/settings/company-info` | A · `settings.company_info` view/update | company profile; CBMS password encrypted, never returned |
+| GET | `/api/accounts/chart` | A · `accounts.charts_of_accounts` read | 3-level COA tree |
+| GET | `/api/accounts/groups` | A · `accounts.charts_of_accounts` read | flat group list for pickers |
+| GET/POST | `/api/accounts/ledgers` | A · `accounts.charts_of_accounts` read/create | ledger search (`?search&groups&heads&contactKind`) / create (auto-code, opening → OPENING voucher) |
+| PATCH/DELETE | `/api/accounts/ledgers/[id]` | A · `accounts.charts_of_accounts` update/delete | edit / soft-delete (blocked if used, system rows locked) |
+| GET/POST | `/api/accounts/contacts` | A · `accounts.contacts` read/create | `?kind=CUSTOMER\|SUPPLIER`; create under TRR-01/TRP-01 |
+| PATCH | `/api/accounts/contacts/[id]` | A · `accounts.contacts` update | edit contact |
+| GET/POST | `/api/accounts/vouchers` | A · `vouchers.journal_voucher\|contra_voucher` | `?type=JOURNAL\|CONTRA`; POST posts via `postVoucher` (ΣDr=ΣCr enforced) |
+| GET | `/api/accounts/vouchers/[id]` | A · `vouchers.journal_voucher` read | voucher detail with lines |
+| GET | `/api/reports/trial-balance` | A · `reports.accounting_reports` read | active FY; `?asOf=` |
+| GET | `/api/reports/ledger/[id]` | A · `reports.accounting_reports` read | running ledger statement |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 

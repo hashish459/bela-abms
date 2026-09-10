@@ -71,6 +71,39 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 - **Not yet:** image uploads (logo/stamp/QR/signature), FY "Resync Opening" (needs GL), the
   other 11 Settings sub-pages (still stubbed).
 
+### Session 5 — 2026-09-11 (Module 2 — Accounts / General Ledger spine)
+- **Scraped the reference's full NFRS chart of accounts** (Export endpoint): 36 account heads,
+  106 groups, 181 ledgers → `app/prisma/data/nfrs-coa.ts` (auto-generated). Enums confirmed:
+  `account_type` AS/LI/EQ/IN/EX, `current_account_type` CU/NC/O, `financial_account_type` FI/NF/O.
+- Prisma: `AccountHead`, `AccountGroup`, `Ledger` (3-level, ledgers double as customer/supplier
+  contacts), `Voucher` + `VoucherLine`, `NumberSequence`. Migration `accounts_general_ledger`.
+  Seed now builds the whole NFRS COA for the demo company + an "Opening Balance Adjustment"
+  suspense ledger.
+- **`src/server/accounts/gl.ts` — the GL core:**
+  - `postVoucher(tx, …)` — THE single writer of ledger entries. Enforces Σdebit = Σcredit,
+    validates ledgers/fiscal-year, allocates a gap-free number (`JV-2083/84-0001`), audits.
+  - `postOpeningBalance()` — opening balances post a balanced OPENING voucher vs the suspense
+    account, so the trial balance always ties.
+  - `reverseVoucher()` — mirror-post for cancellations.
+  - `trialBalance()` / `ledgerStatement()` — read **purely from VoucherLine** (opening balances
+    included as OPENING vouchers; `Ledger.openingBalance` is reference metadata only).
+- `src/server/accounts/service.ts` — chart-of-accounts tree, ledger CRUD (auto-code
+  `<group>-<seq>`, blocks delete if used), contacts (customer/supplier under TRR-01/TRP-01),
+  manual vouchers (journal + contra; contra restricted to cash & bank).
+- API: `/api/accounts/{chart,groups,ledgers[/id],contacts[/id],vouchers[/id]}`,
+  `/api/reports/{trial-balance,ledger/[id]}`. `src/lib/guard.ts` helper +
+  `src/lib/fiscal-year.ts` (active FY).
+- UI: Accounts section (`TabNav`) + Chart of Accounts (collapsible AS/LI/EQ/IN/EX tree,
+  Add Account) + Contacts (Customers/Suppliers tabs, full contact form) + Vouchers section +
+  Journal/Contra Voucher (double-entry grid, live balance check, `LedgerPicker` combobox) +
+  Trial Balance report (grouped, print). `src/components/{ledger-picker,tab-nav}.tsx`.
+- **Verified via curl + browser:** balanced JV posts (`JV-2083/84-0001`), unbalanced → 422,
+  trial balance ties, opening balances flow through GL, ledger statement runs, cashier RBAC
+  (403 on chart, 200 on contacts). tsc + eslint + build green.
+- **Gaps:** no Vitest yet for `postVoucher` (verified manually); Cash & Bank + Balance
+  Confirmation pages still stubbed; ledger-picker shows group name a bit cramped; no
+  voucher edit/delete UI (reverse only via API).
+
 ### Client decisions (2026-09-11)
 - **v1 scope:** Core accounting ERP **+ industry verticals** (Fixed Assets, Manufacturing/BOM,
   Workshop, Restaurant, Fuel/Token, Printing). **Out of v1:** CRM, Budget, Store Builder.
@@ -85,9 +118,9 @@ Recommended order & why:
   1. **Settings core:** ✅ Fiscal Year (BS⇆AD) · ✅ Tax rates · ✅ Company Info (+ IRD/CBMS,
      encrypted) — *done session 4*. ⬜ Users & Roles UI (permission-matrix editor) ·
      ⬜ Custom Fields · ⬜ Banks · ⬜ Bill Footer · ⬜ Invoice Setting · ⬜ Backup.
-  2. **Accounts / GL (the spine):** `AccountHead`/`AccountGroup`/`Ledger` 3-level COA +
-     NFRS seed · `Voucher`/`VoucherLine` + **`postVoucher()`** service (ΣDr=ΣCr) ·
-     Contacts (customer/supplier ledgers) · Cash & Bank. Everything financial posts here.
+  2. **Accounts / GL (the spine):** ✅ 3-level NFRS COA + seed · ✅ `Voucher`/`VoucherLine` +
+     `postVoucher()` (ΣDr=ΣCr) · ✅ Contacts · ✅ Journal/Contra voucher UI · ✅ Trial Balance
+     — *done session 5*. ⬜ Cash & Bank page · ⬜ Balance Confirmation · ⬜ Vitest for GL.
   3. **Inventory:** Category, Unit, Warehouse, Product (GD/SR/EX, 3-level units, tax type),
      `StockMovement` ledger + `postStockMovement()`, opening stock.
   4. **Sales:** Quotation → Sales Order → **Sales Invoice** (server totals engine W4 +

@@ -32,6 +32,10 @@ model Company {
   auditLogs     AuditLog[]
   reminders     Reminder[]
   notifications Notification[]
+  accountHeads  AccountHead[]
+  accountGroups AccountGroup[]
+  ledgers       Ledger[]
+  vouchers      Voucher[]
 }
 
 model Branch {
@@ -62,7 +66,8 @@ model FiscalYear {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vouchers Voucher[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -147,6 +152,7 @@ model User {
   auditLogs     AuditLog[]
   reminders     Reminder[]
   notifications Notification[]
+  vouchers      Voucher[]
 }
 
 enum UserStatus {
@@ -276,6 +282,185 @@ model MenuItem {
   children MenuItem[] @relation("MenuChildren")
 
   @@index([parentId])
+}
+
+/// ────────────────────  ACCOUNTS / GENERAL LEDGER  ───────────────────
+/// Mirrors the reference's 3-level NFRS chart of accounts
+/// (AccountHead → AccountGroup → Ledger). See Docs/REFERENCE-API-MAP.md.
+
+enum AccountType {
+  AS // Assets
+  LI // Liabilities
+  EQ // Equity
+  IN // Income
+  EX // Expense
+}
+
+enum CurrentType {
+  CU // Current
+  NC // Non-Current
+  O // not applicable (P&L accounts)
+}
+
+enum FinancialType {
+  FI // Financial
+  NF // Non-Financial
+  O // not applicable
+}
+
+enum BalanceType {
+  DR
+  CR
+}
+
+enum ContactKind {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+model AccountHead {
+  id            String        @id @default(cuid())
+  companyId     String
+  code          String // "ADE", "CCE", "TRR" …
+  name          String
+  accountType   AccountType
+  currentType   CurrentType   @default(O)
+  financialType FinancialType @default(O)
+  isSystem      Boolean       @default(false) // NFRS-reserved; not deletable
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  groups  AccountGroup[]
+
+  @@unique([companyId, code])
+  @@index([companyId, accountType])
+}
+
+model AccountGroup {
+  id            String   @id @default(cuid())
+  companyId     String
+  accountHeadId String
+  code          String // "ADE-01"
+  name          String
+  isSystem      Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountHead AccountHead @relation(fields: [accountHeadId], references: [id], onDelete: Cascade)
+  ledgers     Ledger[]
+
+  @@unique([companyId, code])
+  @@index([accountHeadId])
+}
+
+/// Level-3 posting account. Customers/suppliers ARE ledgers (under Trade Receivable /
+/// Trade Payable), carrying the party fields.
+model Ledger {
+  id             String      @id @default(cuid())
+  companyId      String
+  accountGroupId String
+  code           String // "CCE-01-0001"
+  name           String
+  openingBalance Decimal     @default(0) @db.Decimal(18, 2)
+  openingType    BalanceType @default(DR)
+  isSystem       Boolean     @default(false)
+  isActive       Boolean     @default(true)
+
+  // Party fields — populated when this ledger is a customer/supplier contact.
+  contactKind ContactKind?
+  panNumber   String?
+  phone       String?
+  email       String?
+  address     String?
+  creditLimit Decimal?     @db.Decimal(18, 2)
+  iecNo       String?
+  gstin       String?
+  bankName    String?
+  bankAccount String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountGroup AccountGroup  @relation(fields: [accountGroupId], references: [id], onDelete: Restrict)
+  voucherLines VoucherLine[]
+
+  @@unique([companyId, code])
+  @@index([accountGroupId])
+  @@index([companyId, contactKind])
+}
+
+enum VoucherType {
+  OPENING
+  JOURNAL
+  CONTRA
+  STOCK
+  SALES
+  PURCHASE
+  RECEIPT
+  PAYMENT
+  CREDIT_NOTE
+  DEBIT_NOTE
+  EXPENSE
+}
+
+/// Every financial document posts one balanced Voucher via postVoucher(). Reports read
+/// VoucherLine, never the source documents.
+model Voucher {
+  id           String      @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  number       String // "JV-2083/84-0001"
+  date         DateTime    @db.Date
+  type         VoucherType
+  narration    String?
+  sourceType   String? // "SalesInvoice", "Receipt" … null for manual vouchers
+  sourceId     String?
+  createdById  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
+
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear    @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  createdBy  User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  lines      VoucherLine[]
+
+  @@unique([companyId, number])
+  @@index([companyId, fiscalYearId, date])
+  @@index([sourceType, sourceId])
+}
+
+model VoucherLine {
+  id        String  @id @default(cuid())
+  voucherId String
+  ledgerId  String
+  debit     Decimal @default(0) @db.Decimal(18, 2)
+  credit    Decimal @default(0) @db.Decimal(18, 2)
+  narration String?
+  order     Int     @default(0)
+
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  ledger  Ledger  @relation(fields: [ledgerId], references: [id], onDelete: Restrict)
+
+  @@index([voucherId])
+  @@index([ledgerId])
+}
+
+/// Gap-free sequential numbering per (company, fiscalYear, key). Locked increment.
+model NumberSequence {
+  id           String  @id @default(cuid())
+  companyId    String
+  fiscalYearId String?
+  key          String // "voucher:JOURNAL", "invoice:SA" …
+  nextValue    Int     @default(1)
+
+  @@unique([companyId, fiscalYearId, key])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────

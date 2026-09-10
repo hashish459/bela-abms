@@ -111,14 +111,18 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Data-driven menu + submenus | ✓ | ✅ (`/api/menu`, permission-filtered) |
 | App shell (sidebar/header/FY/bell/profile) | ✓ | ✅ (bell/search not wired to data) |
 | Dashboard widgets/KPIs | ✓ | ⬜ (needs transaction modules) |
-| Company / Branch / Fiscal year | ✓ | ✅ model + seed; ⬜ switcher UI |
-| Forms / validation | ✓ | ⬜ |
-| CRUD (any domain module) | ✓ | ⬜ |
-| Search / filters / pagination | ✓ | ⬜ |
-| Reports / print / export | ✓ | ⬜ |
+| Company / Branch / Fiscal year | ✓ | ✅ Company Info + Fiscal Year (BS/AD) + Tax pages; ⬜ switcher UI |
+| Chart of Accounts (3-level NFRS) | ✓ | ✅ seed (36/106/181) + browser + Add Account |
+| Contacts (customer/supplier) | ✓ | ✅ Customers/Suppliers + form (opening → GL) |
+| General ledger / double-entry | ✓ | ✅ `postVoucher` (ΣDr=ΣCr), Journal + Contra voucher UI |
+| Trial Balance | ✓ | ✅ (grouped, print) — reads GL |
+| Forms / validation | ✓ | ✅ settings + accounts modules (Zod both sides) |
+| CRUD (domain module) | ✓ | ✅ ledgers, contacts, tax, fiscal years, vouchers |
+| Search / filters / pagination | ✓ | ◑ ledger search + voucher pagination; per-module later |
+| Reports / print / export | ✓ | ◑ Trial Balance (print); PDF/Excel + other reports later |
 | Inventory movement logic | ✓ | ⬜ |
 | Billing calculation engine | ✓ | ⬜ |
-| Responsive UI | ✓ | ✅ shell (per-module later) |
-| Audit logging | ✓ | ✅ infra + login/logout; ⬜ domain events |
+| Responsive UI | ✓ | ✅ shell + modules |
+| Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |
 
 Do not mark complete because a page renders.
