@@ -56,8 +56,17 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 - Still to capture (during each module build): POST payloads, exact VAT/discount math,
   invoice-number format, `/users/permissions/my/` shape, per-report columns.
 
+### Client decisions (2026-09-11)
+- **v1 scope:** Core accounting ERP **+ industry verticals** (Fixed Assets, Manufacturing/BOM,
+  Workshop, Restaurant, Fuel/Token, Printing). **Out of v1:** CRM, Budget, Store Builder.
+- **Tenancy:** single company per deployment (`companyId` column scoping — as scaffolded).
+- **IRD/CBMS:** model the fields + build a stubbed integration seam; no real IRD calls in v1.
+- **Reference test data:** OK to create sample records in the live reference app and leave them
+  → capture exact `POST` payloads + calculation results per module.
+
 ### ⏭️ RESUME HERE (next session) — begin Phase 5 modules
-Development proceeds **part by part** (client's instruction). Recommended order & why:
+Development proceeds **part by part** (client's instruction: one module per session, confirm each).
+Recommended order & why:
   1. **Settings core:** Company Info (+ IRD/CBMS fields), Fiscal Year (BS⇆AD), Tax rates,
      Users & Roles UI (permission-matrix editor), Custom fields, Banks. *Unblocks everything.*
   2. **Accounts / GL (the spine):** `AccountHead`/`AccountGroup`/`Ledger` 3-level COA +
@@ -73,7 +82,8 @@ Development proceeds **part by part** (client's instruction). Recommended order 
   7. **Reports:** Trial Balance → Ledger → P&L → Balance Sheet → Day Book → Stock Summary →
      VAT Return / Annexes → Aging. (All read GL / StockMovement.)
   8. **Dashboard** widgets (now real numbers exist).
-  9. **CRM, Budget, Token, Documents, Store Builder**, then verticals per client scope.
+  9. **Documents**, then **verticals** (Fixed Assets → Manufacturing → Workshop → Restaurant →
+     Fuel/Token → Printing). *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls
   `postVoucher`/`postStockMovement`) → `/api/<domain>` routes (`requirePermission`) →
   UI page replacing the stub → Vitest (calc + posting) + Playwright (workflow).
