@@ -1,7 +1,76 @@
 # DISCOVERY LOG — reference application
 
 Notes from inspecting **https://bela.nepalebilling.com** (authenticated, Admin account).
-Structured conclusions in `INVENTORY.md`. **No credentials or tokens recorded here.**
+Structured conclusions in `INVENTORY.md`; API detail in `REFERENCE-API-MAP.md`;
+domain model in `DATABASE.md`. **No credentials or tokens recorded here.**
+
+---
+
+## SESSION 3 ADDENDUM (2026-09-11) — deep API / domain dive
+
+Captured live XHR traffic (patched `fetch`/`XMLHttpRequest`) while driving the app.
+
+### Backend architecture
+- **Django + Django REST Framework**, **django-tenants** (schema-per-company on PostgreSQL).
+  `GET /companies/` → `{id, name, schema_name:"bela", domain:"bela.api.nepalebilling.com",
+  parent_company, is_parent, is_current, branch_count}`. Companies can nest (`parent_company`).
+- Auth **SimpleJWT** — `access_token` + `refresh_token` cookies (readable by JS in the reference;
+  our clone uses httpOnly). Claims: `user_id`, `user_type` (`AD`).
+- **Three resource families:**
+  `/invoices/` (trade docs, `invoice_type` SA/PU/QU/SO/PO/PF) ·
+  `/slips/` (accounting vouchers, `slip_type` JO/CO/ST) ·
+  `/ledgers/` (3-level chart of accounts: account-head → group-head → general-ledger).
+- RBAC backend = **Django groups + model permissions** (`add_/change_/delete_/view_<model>`,
+  301 perms over 76 models). Seeded groups: **Admin, Cashier, Retailer, Storekeeper**.
+  The UI "Permissions Matrix" maps these to friendly module names grouped by nav.
+- **76 backend models** — full list in `DATABASE.md`. Notable: a full **Fixed Assets**
+  subsystem (asset, asset life/depreciation, capitalization, sell/lost-stolen-broken),
+  **CRM** (client/partner/contract/follow-up/interaction/target/visit-history/location-point),
+  **manufacturing** (material bill = BOM, manufacture-demolish), and industry verticals
+  **workshop job card / technician**, **restaurant table**, **token entry** (fuel), **paper
+  roll / printing cost register** (press) — mostly not surfaced in this tenant's nav.
+
+### Chart of Accounts (NFRS, pre-seeded, `reserved:true` = system)
+3 levels, codes `HEAD` → `HEAD-NN` → `HEAD-NN-NNNN`:
+- **Account Head** (L1): 185 GL accounts roll up through 106 group heads to ~30 account heads.
+  Enums: `account_type` AS/LI/EQ/IN/EX · `current_account_type` CU/NC/O · `financial_account_type` FI/NF/O.
+  Heads seen: ADE, CWIP, CCE, COS, DTA/DTE/DTL/DTOCI, FNI, FNE, ITE, ITP, IAS, PPE, R&S, TRR, TRP.
+- **Contacts** = general-ledger accounts under TRR (customers) / TRP (suppliers). Contact form
+  adds: Parent Ledger, PAN, IEC No., GSTIN, Credit Limit, Bank Name/Acct, Opening Balance DR/CR.
+- **Cash & bank / payment modes** = GL accounts under CCE-01..05 (`/ledgers/general-ledger/bank/`).
+  Payment modes seen: Credit, Cash In Hand, Bank Account, **eSewa**, **Khalti**, **POS**.
+
+### Company Info (Settings) — IRD compliance
+Legal name, PAN, **Exim Code**, **CBMS Username / CBMS Password** (IRD Central Billing
+Monitoring System), **Registered with VAT**, **Separate purchase/sales tax**, **Sync With IRD**
+(real-time invoice push to tax authority). Logo / Stamp / Payment QR / Signature uploads.
+This tenant: "Bela Nepal Industries", PAN 605919129, VAT-registered, separate-tax off.
+
+### Tax
+`Settings › Tax` — configurable list "published by IRD": `Name`, `Rate (in %)`, `No Tax` flag.
+Nepal standard is **VAT 13%** + 0% exempt. Product carries `taxType` (inclusive/exclusive) +
+`nonTaxable`. (Exact seeded rows not captured — verify when building.)
+
+### Inventory
+Units have `accept_fraction` (pcs=false, kg/lt=true). Categories self-nest. Warehouses belong
+to a branch ("Default Warehouse" / "Main Branch"). Products: `product_type` GD/SR/EX, up to
+3 unit levels with conversions, batches, 9 optional serialised-item fields.
+
+### Custom fields
+Attachable to 18 doc types: Quick Receipt, Sales Invoice, Customer, Supplier, Supplier Payment,
+Quotation, Purchase Order, Sales Order, Purchase Voucher, Credit Note, Debit Note, Expense,
+Payment, Journal Voucher, Chalani, Product, Sales Table Columns, Purchase Table Columns.
+→ implies a "Quick Receipt" (POS) flow distinct from full Sales Invoice.
+
+### Reports
+`/reports/<name>/` with rich Django-lookup filters. Trial Balance row carries opening / period
+dr / period cr / closing + balance_type, joined up the account hierarchy. Dashboard widgets
+each hit a `/reports/*/dashboard/` endpoint (no fake numbers — all computed server-side).
+
+### Still open (capture when building each module)
+`POST` payloads for invoice/slip/receipt/payment; VAT+discount apportionment math;
+invoice-number format & CBMS sync protocol; `/users/permissions/my/` shape; per-report columns;
+Fixed-Assets & CRM & Budget & Store endpoints; Quick Receipt flow.
 
 ---
 

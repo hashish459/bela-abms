@@ -47,26 +47,74 @@ Delete:  DELETE /api/<module>/:id → permission <module>.delete → confirm dia
 
 ---
 
-## W? — Billing / Invoice  (TBD from reference — CRITICAL)
+---
 
-Capture exactly:
-- Customer selection → what customer data flows in (billing info, balance, price list)
-- Line item: product select → auto-populate unit / price / tax
-- Quantity × price → line subtotal; discount (line? invoice? % or amount?)
-- Tax computation (VAT 13%? per-line or on subtotal? inclusive/exclusive?)
-- Invoice subtotal → discount → taxable amount → VAT → grand total
-- Payment (full/partial) → balance; invoice status transitions
-- Invoice number generation (format, sequence, per-fiscal-year, IRD CBMS sync?)
-- Effect on inventory (stock movement OUT) and ledger (journal entry)
-- Print / PDF / export format
-- **Transaction boundary:** Invoice + InvoiceItems + StockMovement + Payment + JournalEntry + AuditLog
+## W3 — Double-entry GL posting  (CORE — every financial doc goes through this)
 
-## W? — Inventory / stock movement (TBD)
+The reference keeps a real general ledger. Documents (`/invoices/`, receipts, payments) and
+manual vouchers (`/slips/`) all **post balanced journal entries** to `Voucher`/`VoucherLine`
+against `Ledger` accounts. Reports (`/reports/trail-balance/`, P&L, Balance Sheet) read the
+**GL**, never the source documents.
 
-- Opening stock, purchase (IN), sale (OUT), adjustment, return
-- Current stock = derived from movements (not a mutable field) — confirm
-- Per branch/warehouse if present
+```
+postVoucher({ date, type, lines:[{ledgerId, debit, credit, narration}], sourceType, sourceId })
+  invariant: Σ debit == Σ credit  (reject otherwise)
+  → Voucher + VoucherLine rows
+  → each line updates the running balance used by Trial Balance
+  → AuditLog
+```
 
-## W? — Reports (TBD)
+Clone rule: a single `postVoucher()` service is the ONLY writer of GL entries. Modules call
+it inside their transaction; they never write ledger balances directly.
 
-- Each report: inputs (date range, filters) → query → aggregation → render → export
+## W4 — Sales Invoice  (customer → invoice → GL + stock + receivable)
+
+```
+Select customer (Ledger under TRR) → pull PAN, credit limit, current balance
+Add line: pick Product/Batch → auto Warehouse, H.S Code, Rate (selling price), tax flag
+  line.amount = qty × rate − line.discount
+Invoice discount (Rs, header) applies to the TAXABLE base (apportionment rule: A4 — confirm)
+Totals (server-authoritative):
+  nonTaxableTotal = Σ line.amount where product.nonTaxable
+  taxableBase     = Σ line.amount where taxable  − invoiceDiscount(taxable portion)
+  vatAmount       = round(taxableBase × taxRate)          # taxRate = 0.13
+  grandTotal      = nonTaxableTotal + taxableBase + vatAmount
+  # tax-inclusive products: back out VAT from the rate first
+Save →  (one DB transaction)
+  Invoice + InvoiceItem[]                       (invoice_type = SA)
+  StockMovement OUT per line (from batch/warehouse)   → reduces on-hand
+  postVoucher(SALES):
+     Dr  Customer (TRR)            grandTotal
+     Cr  Sales Revenue (IN)        taxableBase + nonTaxableTotal
+     Cr  VAT Payable (LI)          vatAmount
+     Dr  COGS (EX)  / Cr Inventory (AS)   at cost      # perpetual inventory
+  if payment mode ≠ Credit:  Receipt + postVoucher(Dr Cash/Bank, Cr Customer)
+  invoice_number = next sequential for (company, fiscalYear, SA)   # gap-free, IRD
+  AuditLog: CREATE invoice
+  if company.syncWithIrd:  queue CBMS push (stubbed in v1 — A16)
+Post-save actions available: Chalani · Receipt · Cheque · Credit Note · print/PDF
+```
+
+## W5 — Purchase Invoice  (supplier → bill → GL + stock + payable)
+
+Like W4 but: supplier ledger (TRP), lines add **Excise duty** + **Custom duty** columns,
+`Supplier Invoice Number` required, stock movement is **IN** at purchase cost, VAT is
+**input VAT** (Dr VAT Receivable). Related: Goods Received (GRN), Import (LC/customs), Expense.
+
+## W6 — Inventory / stock movement
+
+`current on-hand = Σ StockMovement(product, warehouse, batch)`. Never a mutable field.
+Sources: opening (product create), purchase IN, sale OUT, adjustment ±, warehouse transfer
+(OUT+IN), branch transfer, sales/purchase return, manufacture (consume BOM → produce).
+Reports: Stock Summary, Batch-wise, Expiry Management.
+
+## W7 — Journal / Contra / Stock Voucher  (`/slips/`)
+
+Manual entry. Journal = any Dr/Cr lines (must balance). Contra = cash↔bank only.
+Stock Journal = non-financial stock adjustments. All go through `postVoucher()`.
+
+## W8 — Reports
+
+Each report = filter panel (fiscal-year date range in BS, branch, account-type filters,
+search) → server aggregation over GL / StockMovement / Invoice → table → Print / PDF / Excel.
+Dashboard widgets each call a dedicated `/reports/*/dashboard/` aggregate — no client math.

@@ -23,6 +23,7 @@ that could become a production replacement for the reference application.
 |------|---------------|
 | [`Docs/PROGRESS.md`](Docs/PROGRESS.md) | **Session log + what's done / what's next.** Start here. |
 | [`Docs/DISCOVERY-LOG.md`](Docs/DISCOVERY-LOG.md) | Raw notes from inspecting the reference app |
+| [`Docs/REFERENCE-API-MAP.md`](Docs/REFERENCE-API-MAP.md) | Reverse-engineered reference API + enums |
 | [`Docs/INVENTORY.md`](Docs/INVENTORY.md) | Complete module / page / action inventory |
 | [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | System, frontend, backend, auth, authz architecture |
 | [`Docs/DATABASE.md`](Docs/DATABASE.md) | Entities, relationships, constraints, ER model |

@@ -45,25 +45,41 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
     gated "not implemented" stub for wired-but-unbuilt routes.
   - ✅ `tsc --noEmit`, `eslint src`, `next build` all pass.
 
-### ⏭️ RESUME HERE (next session)
-- **Option A — deeper discovery** (recommended before heavy module work): log into reference,
-  capture per-form validation/modals/empty+error states, the Sales Invoice + Purchase Invoice
-  calculation math (VAT rate, inclusive/exclusive, discount scope), invoice-number format,
-  Contra/Stock-journal/Credit-note/Debit-note forms, each Report's filters+columns, Settings
-  sub-pages (Tax, Custom fields, Printing templates), and a lower-privilege role's nav diff.
-- **Option B — start modules** (Phase 5), in this order:
-  1. **Settings core:** Company Info, Fiscal Year, Tax rates, Users & Roles UI (matrix editor),
-     Custom fields, Banks. (Unblocks everything else.)
-  2. **Accounts:** Chart of Accounts (seed NFRS COA ~190 accounts), Contacts (customer/supplier),
-     Cash & Bank.
-  3. **Inventory:** Product Category, Units, Warehouse, Product, opening stock.
-  4. **Sales:** Quotation → Sales Order → Sales Invoice (+ server-side totals engine) → Receipt.
-  5. **Purchase:** Purchase Order → Purchase Invoice → Payment.
-  6. **Vouchers:** Journal / Contra / Stock Journal → GL.
-  7. **Reports:** Trial Balance, P&L, Balance Sheet, Stock Summary, VAT Return, Aging.
-  8. **CRM, Budget, Token, Documents, Store Builder.**
-- Each module: Prisma models → migration → Zod validators → service (tx) → `/api/<domain>`
-  routes (`requirePermission`) → UI page replacing the stub → Vitest + Playwright.
+### Session 3 — 2026-09-11 (deep discovery)
+- Captured live API traffic. Findings → `Docs/REFERENCE-API-MAP.md` (new),
+  `DISCOVERY-LOG.md` (session-3 addendum), `DATABASE.md` (76-model inventory),
+  `WORKFLOWS.md` (GL posting W3–W8), `ARCHITECTURE.md` §0, `ASSUMPTIONS.md` (A3–A17).
+- Key: Django+DRF, **schema-per-tenant**; 3 API families `/invoices/` `/slips/` `/ledgers/`;
+  **real double-entry GL** (reports read the ledger); 3-level NFRS chart of accounts with
+  enum codes; contacts = GL accounts; **IRD/CBMS** compliance fields; 76 backend models
+  incl. Fixed Assets, Manufacturing, Workshop, Restaurant, Fuel, CRM, Budget verticals.
+- Still to capture (during each module build): POST payloads, exact VAT/discount math,
+  invoice-number format, `/users/permissions/my/` shape, per-report columns.
+
+### ⏭️ RESUME HERE (next session) — begin Phase 5 modules
+Development proceeds **part by part** (client's instruction). Recommended order & why:
+  1. **Settings core:** Company Info (+ IRD/CBMS fields), Fiscal Year (BS⇆AD), Tax rates,
+     Users & Roles UI (permission-matrix editor), Custom fields, Banks. *Unblocks everything.*
+  2. **Accounts / GL (the spine):** `AccountHead`/`AccountGroup`/`Ledger` 3-level COA +
+     NFRS seed · `Voucher`/`VoucherLine` + **`postVoucher()`** service (ΣDr=ΣCr) ·
+     Contacts (customer/supplier ledgers) · Cash & Bank. Everything financial posts here.
+  3. **Inventory:** Category, Unit, Warehouse, Product (GD/SR/EX, 3-level units, tax type),
+     `StockMovement` ledger + `postStockMovement()`, opening stock.
+  4. **Sales:** Quotation → Sales Order → **Sales Invoice** (server totals engine W4 +
+     `postVoucher` + `postStockMovement` + numbering) → Receipt → Credit Note.
+  5. **Purchase:** Purchase Order → Purchase Invoice (excise/custom duty, input VAT) →
+     Payment → Debit Note → Goods Received / Import.
+  6. **Vouchers UI:** Journal / Contra / Stock Journal (thin UI over `postVoucher`).
+  7. **Reports:** Trial Balance → Ledger → P&L → Balance Sheet → Day Book → Stock Summary →
+     VAT Return / Annexes → Aging. (All read GL / StockMovement.)
+  8. **Dashboard** widgets (now real numbers exist).
+  9. **CRM, Budget, Token, Documents, Store Builder**, then verticals per client scope.
+- Each module: Prisma models → migration → Zod validators → service (tx, calls
+  `postVoucher`/`postStockMovement`) → `/api/<domain>` routes (`requirePermission`) →
+  UI page replacing the stub → Vitest (calc + posting) + Playwright (workflow).
+- **Capture before building each:** that module's `POST` payload from the reference
+  (drive the form, submit a throwaway record IF the client OKs test data, else read the
+  form + JS). Add findings to `REFERENCE-API-MAP.md`.
 
 ---
 
@@ -79,9 +95,19 @@ npm run typecheck && npx eslint src && npm run build
 ```
 
 ## Open questions for the client
-- VAT: fixed 13% or configurable per product/tax-type? Inclusive or exclusive pricing?
-- Invoice number format & does it sync to IRD CBMS / need real-time validation?
-- Is the e-commerce **Store Builder** in scope for the clone, or back-office only first?
-- Multi-company: one company per deployment, or true multi-tenant with company switcher?
-- Can we get a second, lower-privilege user login to map permission-gated differences?
-- Chart of Accounts: use the reference's exact NFRS list? (can export from reference if so)
+1. **Scope / order** — confirm the module order above. Which of these are in v1 vs later:
+   Store Builder (e-commerce), Fixed Assets, Budget (NGO funds), CRM, and the industry
+   verticals (Workshop, Restaurant, Fuel/Token, Printing)?
+2. **Multi-tenancy** — one company per deployment (our `companyId` model), or true
+   schema-per-tenant + company switcher like the reference? Nestable parent/child companies?
+3. **IRD / CBMS** — do you have CBMS API credentials + spec? Should v1 actually push invoices
+   to IRD, or model the fields + stub the integration (recommended)?
+4. **Invoice numbering** — required format (prefix, fiscal-year segment, width)? Confirm
+   cancellation-not-deletion policy.
+5. **Chart of Accounts** — OK to copy the reference's exact NFRS list (≈30 heads / 106 groups /
+   185 ledgers)? We can scrape all 3 levels from the reference.
+6. **Test data** — may we create a few throwaway records in the reference app to capture
+   exact `POST` payloads and calculation results? (Otherwise we infer from forms + JS.)
+7. **Second login** — a lower-privilege reference user (e.g. the Cashier) to map nav/permission
+   differences precisely.
+8. **VAT** — confirm 13% standard + 0% exempt is the whole picture (any excise/other rates you use).

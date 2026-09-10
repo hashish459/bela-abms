@@ -69,6 +69,20 @@ Observed users: Sarthak (Admin), Ashish (Admin), Zenith (Cashier + Retailer + St
 
 ---
 
+## 3b. Backend-only / feature-flagged modules (from 76-model list — `DATABASE.md`)
+
+Present in the reference **backend** but not in this tenant's navigation. Scope decision needed.
+
+| Area | Models | Likely trigger |
+|------|--------|----------------|
+| **Fixed Assets** | asset, asset life (depreciation), asset expense, capitalization, purchase asset, purchase order asset, sell asset, lost stole broken, ownership letter | asset-heavy businesses (marketing site advertises it) |
+| **Manufacturing** | material bill (BOM), manufacture demolish | producers |
+| **Workshop** (auto/repair) | workshop job card, workshop technician | garages |
+| **Restaurant** | restaurant table | F&B |
+| **Fuel dealer** | token entry | petrol pumps (Token nav item = this) |
+| **Printing/press** | paper roll register, printing cost register | print shops (Sales sub-items) |
+| **Field sales / CRM+** | crm interaction, crm target, crm contract, visit history, location point (GPS) | distribution |
+
 ## 4. Reports catalogue (observed)
 Accounting: Transaction List, General Ledger Summary, Trial Balance, Contra Report, P&L,
 Day Book, Ledger Report, Journal Report, Statement of Financial Position, Statement of OCI.

@@ -5,11 +5,13 @@
 | Layer | Reference (`bela.nepalebilling.com`) | Our clone (`app/`) |
 |-------|--------------------------------------|--------------------|
 | Frontend | Next.js **Pages Router** SPA | Next.js 16 **App Router** (RSC) |
-| Backend | Separate **Django REST Framework** API at `bela.api.nepalebilling.com` (+ shared `api.nepalebilling.com`) | Next.js route handlers (`app/api/**`), layered service/repository |
-| DB | (not observable) PostgreSQL-class relational | PostgreSQL + Prisma |
+| Backend | **Django REST Framework** at `bela.api.nepalebilling.com` (+ shared `api.nepalebilling.com`). 76 models; families `/invoices/` (trade docs), `/slips/` (vouchers), `/ledgers/` (3-level COA) | Next.js route handlers (`app/api/**`), layered service/repository; one `postVoucher()` GL writer |
+| DB | PostgreSQL, **schema-per-tenant** (django-tenants); companies nestable (`parent_company`) | PostgreSQL + Prisma, **single schema, `companyId` column** scoping (A5) |
 | Auth | **JWT** (SimpleJWT) — `access_token`/`refresh_token` cookies, JS-readable | JWT in **httpOnly** cookies, rotating refresh, server-side session load |
-| Multi-tenancy | Company (subdomain) → Branch; per-company API subdomain | `Company.subdomain` + `Branch`; single deployment, company scoping in queries |
-| i18n | Nepali fiscal year (BS), Nepali months, `Rs.` (NPR) | same domain model; BS↔AD handled in a date layer (later) |
+| RBAC | Django groups + model perms (301 perms / 76 models); groups Admin/Cashier/Retailer/Storekeeper; UI matrix maps to nav modules | `Role` + `RolePermission` CRUD matrix over `PermissionModule` (nav-grouped) |
+| Accounting | Real double-entry GL; reports read the ledger, not documents | same — `Voucher`/`VoucherLine`, `postVoucher()` invariant ΣDr=ΣCr |
+| i18n | Nepali fiscal year (BS) in UI, **AD dates in API**, Nepali months, `Rs.` (NPR) | same; BS⇆AD date layer (`nepali-date-converter`), store AD, display BS |
+| Compliance | IRD: PAN, CBMS username/password, "Sync With IRD", gap-free sequential invoice numbers | model the fields + a stubbed CBMS integration seam (A16); enforce numbering (A15) |
 | Styling | Tailwind, accent `#00A8E8`, DM Sans, bg `#F0F0F0` | identical tokens in `globals.css` |
 
 ## 1. System
