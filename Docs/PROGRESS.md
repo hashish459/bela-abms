@@ -13,6 +13,89 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 18 — 2026-09-11 (Reports catalogue — cloned from the reference app)
+Client shared `user_manuals/Key Features.docx` (the vendor's original marketing sheet —
+"Zoom in (Drill Down) from almost all Reports to Source Voucher" is literally in it) and
+pointed at `https://bela.nepalebilling.com/dashboard/reports`, asking to clone that
+reports page and its functions. `/dashboard/reports` itself had no `page.tsx` — only a
+`layout.tsx` with a flat 9-tab bar — so the Reports item in the sidebar 404'd; the
+reference catalogue (documented in `Docs/DISCOVERY-LOG.md` session 5, ~20 reports across
+8 permission-scoped groups: Accounting/Sales/Purchase/Payable & Receivable/Inventory/
+System/Tax/Budget) had never actually been built.
+
+**Built:**
+- **Reports catalogue** (`src/app/(app)/dashboard/reports/page.tsx`,
+  `src/components/reports-catalogue.tsx`) — grouped cards matching the reference
+  structure 1:1, permission-filtered per group (`reports.<x>_reports`), with a
+  localStorage-backed **Favourites** star (matches the reference's own "Favourites"
+  pinning). Replaced the old flat `TabNav` in `reports/layout.tsx` — with ~20 reports a
+  tab bar stopped scaling — with a simple "← All Reports" back-link.
+- **9 new reports**, all in `src/server/reports/service.ts` (same file/pattern as the
+  existing P&L/Balance Sheet/Day Book/VAT Return/Aging functions):
+  - **Transaction List** — every posted `VoucherLine` in a date range, ledger-filterable,
+    paginated. The most granular report; literally implements the brief's "drill down to
+    source voucher" feature.
+  - **General Ledger Summary** — per-ledger opening/debit/credit/closing for a date
+    *range*, distinct from Trial Balance (always cumulative "as of" one date).
+  - **Journal Report / Contra Report** — read-only report view of posted vouchers,
+    gated by `reports.accounting_reports` rather than the Vouchers module, so an
+    auditor-type role can see them without voucher-entry rights. Click a row to expand
+    its ledger lines inline (no new route needed for drill-down).
+  - **Sales Report / Purchase Report** — date-ranged, include PAN + VAT columns so the
+    same route also serves as the reference's separate "(Tax)" variant (catalogue links
+    both names to the same page rather than building pixel-duplicate screens — see
+    PROGRESS note below on this judgment call). Rows click through to the Sales/Purchase
+    Invoice detail+print pages built in session 17.
+  - **Sales Return Report / Purchase Return Report** — Credit Notes / Debit Notes,
+    date range.
+  - **Sales Profit Report** — per-invoice gross profit; reads back the COGS voucher
+    `postVoucher()` already wrote at sale time (`SalesDoc.cogsVoucherId`) rather than
+    recomputing cost — zero new cost logic.
+  - **Receipt Report / Payment Report** — Receipts / Supplier Payments, date range.
+  - **Monthly Tax Summary** — output/input VAT bucketed by calendar month (same inputs
+    as the existing `vatReturn()`, grouped differently).
+  - **Activity Log** — `AuditLog` viewer, date range + pagination (System Reports group).
+- Shared client components to avoid duplicating each report's date-range/table
+  boilerplate: `voucher-report-view.tsx`, `doc-report-view.tsx`,
+  `payments-report-view.tsx`, plus one-off views for Transaction List, General Ledger
+  Summary, Sales Profit, Monthly Tax Summary, Activity Log. `print-button.tsx` reused
+  from session 17 on every report.
+
+**Deliberately not built, and why** (shown in the catalogue as greyed-out cards with the
+reason, not silently omitted):
+- **Batch Wise Stock Summary / Expiry Management** — the schema has no `Batch` model;
+  `SalesDocItem.batchId`/`PurchaseDocItem.batchId` are bare optional strings with no
+  backing table. Needs a real Batch/expiry-tracking feature added to Inventory first.
+- **Annex 13 Report / Annex 5 Materialised View Report** — these are precise statutory
+  IRD filing formats. Per the project's inspect-don't-guess rule, fabricating a specific
+  column layout for a tax filing document without the official spec (or an authenticated
+  look at the reference app's own screen) risks handing the client a wrong filing —
+  worse than not having the report at all.
+- **Budget vs Expense Report** — needs the entire Budget module (Budget Heading, Budget,
+  Allocation, Fund) built first; that module doesn't exist in the schema yet at all, and
+  is out of scope for a "reports" pass.
+- **Statement of Other Comprehensive Income** — niche NFRS disclosure (asset revaluation,
+  FX translation reserves) with no underlying feature producing OCI items yet; nothing
+  to report.
+- **Customer Aging Report** — same data as the already-built Receivable Aging; catalogue
+  links both names to that one report rather than duplicating it.
+
+Verified every new report live in the browser (not just typecheck): Transaction List and
+General Ledger Summary both showed period debit = period credit exactly, confirming the
+query logic against `postVoucher()`'s enforced invariant; Sales Report's row click-through
+to the invoice detail/letterhead page (built last session) worked; Journal Report's
+row-expand showed the correct two-line entry; Favourites star-pinning persisted a report
+into its own section. `npm run typecheck`, `npx eslint src` (including fixing several
+React-Compiler purity-rule violations — `Date.now()` can't be called directly in a
+component body, `new Date()` can; the existing codebase's `setTimeout(() => setState(...))`
+wrapper is this project's established workaround for "setState in effect"), and a clean
+`rm -rf .next && npm run build` all pass.
+
+**Still pending** (client's earlier explicit ask, not started this session): the 12
+stubbed Settings sub-pages (Signin & Security, Users & Permissions, Bill Footer, Bank
+Detail, Custom Fields, Banks, Custom Status, Barcode, Invoice Setting, Invoice Import
+Setting, Backup Data, Tour).
+
 ### Session 17 — 2026-09-11 (Vouchers UI polish + printed letterhead)
 Client asked for three things: finish the two stubbed voucher pages, place the real
 `bela-logo.png` file the client dropped into `public/` "like letterhead/bill head", and

@@ -347,3 +347,484 @@ export async function payablesAging(companyId: string, opts: { asOf?: Date } = {
     asOf,
   );
 }
+
+/* ───────────────────────────  Transaction List  ────────────────────────── */
+
+/** Every posted GL line in a date range — the flattest, most granular report;
+ * drills down to its source voucher (Docs key feature: "Zoom in from almost
+ * all Reports to Source Voucher"). */
+export async function transactionList(
+  companyId: string,
+  fiscalYearId: string,
+  opts: { from: Date; to: Date; ledgerId?: string; page?: number; pageSize?: number },
+) {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(200, opts.pageSize ?? 50);
+  const where: Prisma.VoucherLineWhereInput = {
+    voucher: { companyId, fiscalYearId, date: { gte: opts.from, lte: opts.to } },
+    ...(opts.ledgerId ? { ledgerId: opts.ledgerId } : {}),
+  };
+  const [lines, total] = await Promise.all([
+    db.voucherLine.findMany({
+      where,
+      orderBy: [{ voucher: { date: "asc" } }, { voucher: { number: "asc" } }, { order: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true, debit: true, credit: true, narration: true,
+        ledger: { select: { code: true, name: true } },
+        voucher: { select: { id: true, number: true, date: true, type: true, narration: true } },
+      },
+    }),
+    db.voucherLine.count({ where }),
+  ]);
+  return {
+    rows: lines.map((l) => ({
+      lineId: l.id,
+      voucherId: l.voucher.id,
+      voucherNumber: l.voucher.number,
+      voucherType: l.voucher.type,
+      date: l.voucher.date.toISOString().slice(0, 10),
+      ledgerCode: l.ledger.code,
+      ledgerName: l.ledger.name,
+      debit: r2(D(l.debit)),
+      credit: r2(D(l.credit)),
+      narration: l.narration ?? l.voucher.narration ?? "",
+    })),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+/* ─────────────────────────  General Ledger Summary  ────────────────────── */
+
+/** Per-ledger opening (movement before `from`) + period debit/credit +
+ * closing, for a date range — distinct from Trial Balance, which is always
+ * cumulative "as of" a single date from the ledger's inception. */
+export async function generalLedgerSummary(
+  companyId: string,
+  fiscalYearId: string,
+  opts: { from: Date; to: Date },
+) {
+  const ledgers = await db.ledger.findMany({
+    where: { companyId, deletedAt: null },
+    select: {
+      id: true, code: true, name: true,
+      accountGroup: { select: { name: true, accountHead: { select: { name: true, accountType: true } } } },
+    },
+    orderBy: { code: "asc" },
+  });
+  if (!ledgers.length) return { rows: [], totals: { openingDr: "0.00", debit: "0.00", credit: "0.00", closingDr: "0.00" } };
+
+  const ids = ledgers.map((l) => l.id);
+  const [opening, period] = await Promise.all([
+    db.voucherLine.groupBy({
+      by: ["ledgerId"],
+      where: { ledgerId: { in: ids }, voucher: { companyId, fiscalYearId, date: { lt: opts.from } } },
+      _sum: { debit: true, credit: true },
+    }),
+    db.voucherLine.groupBy({
+      by: ["ledgerId"],
+      where: { ledgerId: { in: ids }, voucher: { companyId, fiscalYearId, date: { gte: opts.from, lte: opts.to } } },
+      _sum: { debit: true, credit: true },
+    }),
+  ]);
+  const openById = new Map(opening.map((m) => [m.ledgerId, m._sum]));
+  const periodById = new Map(period.map((m) => [m.ledgerId, m._sum]));
+
+  const rows = ledgers
+    .map((l) => {
+      const o = openById.get(l.id);
+      const p = periodById.get(l.id);
+      const openingNet = D(o?.debit ?? 0).sub(o?.credit ?? 0);
+      const dr = D(p?.debit ?? 0);
+      const cr = D(p?.credit ?? 0);
+      const closingNet = openingNet.add(dr).sub(cr);
+      return {
+        ledgerId: l.id,
+        code: l.code,
+        name: l.name,
+        groupName: l.accountGroup.name,
+        headName: l.accountGroup.accountHead.name,
+        accountType: l.accountGroup.accountHead.accountType,
+        opening: r2(openingNet.abs()),
+        openingType: openingNet.gte(0) ? "DR" : "CR",
+        debit: r2(dr),
+        credit: r2(cr),
+        closing: r2(closingNet.abs()),
+        closingType: closingNet.gte(0) ? "DR" : "CR",
+        _openingNet: openingNet,
+        _closingNet: closingNet,
+        _dr: dr,
+        _cr: cr,
+      };
+    })
+    .filter((r) => r.debit !== "0.00" || r.credit !== "0.00" || r.opening !== "0.00");
+
+  const totals = rows.reduce(
+    (a, r) => ({
+      openingDr: a.openingDr.add(r._openingNet.gt(0) ? r._openingNet : 0),
+      debit: a.debit.add(r._dr),
+      credit: a.credit.add(r._cr),
+      closingDr: a.closingDr.add(r._closingNet.gt(0) ? r._closingNet : 0),
+    }),
+    { openingDr: D(0), debit: D(0), credit: D(0), closingDr: D(0) },
+  );
+
+  return {
+    rows: rows.map((r) => ({
+      ledgerId: r.ledgerId, code: r.code, name: r.name, groupName: r.groupName, headName: r.headName,
+      accountType: r.accountType, opening: r.opening, openingType: r.openingType,
+      debit: r.debit, credit: r.credit, closing: r.closing, closingType: r.closingType,
+    })),
+    totals: {
+      openingDr: r2(totals.openingDr),
+      debit: r2(totals.debit),
+      credit: r2(totals.credit),
+      closingDr: r2(totals.closingDr),
+    },
+  };
+}
+
+/* ──────────────────────  Journal / Contra voucher report  ──────────────── */
+
+/** Read-only report view of posted Journal/Contra vouchers in a date range —
+ * gated by `reports.accounting_reports` rather than the Vouchers module, so
+ * an auditor role can see this without voucher-entry rights. */
+export async function voucherReport(
+  companyId: string,
+  fiscalYearId: string,
+  type: "JOURNAL" | "CONTRA",
+  opts: { from: Date; to: Date },
+) {
+  const vouchers = await db.voucher.findMany({
+    where: { companyId, fiscalYearId, type, date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    include: { lines: { include: { ledger: { select: { code: true, name: true } } }, orderBy: { order: "asc" } } },
+  });
+  let total = D(0);
+  const rows = vouchers.map((v) => {
+    const amount = v.lines.reduce((a, l) => a.add(l.debit), D(0));
+    total = total.add(amount);
+    return {
+      id: v.id,
+      number: v.number,
+      date: v.date.toISOString().slice(0, 10),
+      narration: v.narration ?? "",
+      amount: r2(amount),
+      lines: v.lines.map((l) => ({
+        ledgerCode: l.ledger.code,
+        ledgerName: l.ledger.name,
+        debit: r2(D(l.debit)),
+        credit: r2(D(l.credit)),
+        narration: l.narration ?? "",
+      })),
+    };
+  });
+  return { rows, totalAmount: r2(total) };
+}
+
+/* ──────────────────────────  Sales / Purchase report  ──────────────────── */
+
+export async function salesReport(
+  companyId: string,
+  fiscalYearId: string,
+  type: "INVOICE" | "CREDIT_NOTE",
+  opts: { from: Date; to: Date },
+) {
+  const rows = await db.salesDoc.findMany({
+    where: { companyId, fiscalYearId, type, date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    select: {
+      id: true, number: true, date: true, customerName: true, customerPan: true,
+      referenceNo: true, nonTaxableTotal: true, taxableTotal: true, vatAmount: true,
+      grandTotal: true, amountPaid: true, status: true,
+    },
+  });
+  const totals = rows.reduce(
+    (a, r) => ({
+      nonTaxable: a.nonTaxable.add(r.nonTaxableTotal),
+      taxable: a.taxable.add(r.taxableTotal),
+      vat: a.vat.add(r.vatAmount),
+      grandTotal: a.grandTotal.add(r.grandTotal),
+    }),
+    { nonTaxable: D(0), taxable: D(0), vat: D(0), grandTotal: D(0) },
+  );
+  return {
+    rows: rows.map((d) => ({
+      id: d.id,
+      number: d.number,
+      date: d.date.toISOString().slice(0, 10),
+      party: d.customerName ?? "—",
+      pan: d.customerPan ?? "—",
+      reference: d.referenceNo ?? "—",
+      nonTaxable: r2(D(d.nonTaxableTotal)),
+      taxable: r2(D(d.taxableTotal)),
+      vat: r2(D(d.vatAmount)),
+      grandTotal: r2(D(d.grandTotal)),
+      outstanding: r2(D(d.grandTotal).sub(d.amountPaid)),
+      status: d.status,
+    })),
+    totals: {
+      nonTaxable: r2(totals.nonTaxable),
+      taxable: r2(totals.taxable),
+      vat: r2(totals.vat),
+      grandTotal: r2(totals.grandTotal),
+    },
+  };
+}
+
+export async function purchaseReport(
+  companyId: string,
+  fiscalYearId: string,
+  type: "INVOICE" | "DEBIT_NOTE",
+  opts: { from: Date; to: Date },
+) {
+  const rows = await db.purchaseDoc.findMany({
+    where: { companyId, fiscalYearId, type, date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    select: {
+      id: true, number: true, date: true, supplierName: true, supplierPan: true,
+      supplierInvoiceNumber: true, nonTaxableTotal: true, taxableTotal: true, vatAmount: true,
+      grandTotal: true, amountPaid: true, status: true,
+    },
+  });
+  const totals = rows.reduce(
+    (a, r) => ({
+      nonTaxable: a.nonTaxable.add(r.nonTaxableTotal),
+      taxable: a.taxable.add(r.taxableTotal),
+      vat: a.vat.add(r.vatAmount),
+      grandTotal: a.grandTotal.add(r.grandTotal),
+    }),
+    { nonTaxable: D(0), taxable: D(0), vat: D(0), grandTotal: D(0) },
+  );
+  return {
+    rows: rows.map((d) => ({
+      id: d.id,
+      number: d.number,
+      date: d.date.toISOString().slice(0, 10),
+      party: d.supplierName ?? "—",
+      pan: d.supplierPan ?? "—",
+      reference: d.supplierInvoiceNumber ?? "—",
+      nonTaxable: r2(D(d.nonTaxableTotal)),
+      taxable: r2(D(d.taxableTotal)),
+      vat: r2(D(d.vatAmount)),
+      grandTotal: r2(D(d.grandTotal)),
+      outstanding: r2(D(d.grandTotal).sub(d.amountPaid)),
+      status: d.status,
+    })),
+    totals: {
+      nonTaxable: r2(totals.nonTaxable),
+      taxable: r2(totals.taxable),
+      vat: r2(totals.vat),
+      grandTotal: r2(totals.grandTotal),
+    },
+  };
+}
+
+/* ─────────────────────────  Receipt / Payment report  ──────────────────── */
+
+export async function receiptsReport(companyId: string, fiscalYearId: string, opts: { from: Date; to: Date }) {
+  const rows = await db.receipt.findMany({
+    where: { companyId, fiscalYearId, date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    select: {
+      id: true, number: true, date: true, amount: true, paymentMode: true, reference: true,
+      customerLedgerId: true, paymentLedgerId: true, againstDoc: { select: { number: true } },
+    },
+  });
+  const ledgerIds = [...new Set(rows.flatMap((r) => [r.customerLedgerId, r.paymentLedgerId]))];
+  const ledgers = ledgerIds.length
+    ? await db.ledger.findMany({ where: { id: { in: ledgerIds } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(ledgers.map((l) => [l.id, l.name]));
+  const total = rows.reduce((a, r) => a.add(r.amount), D(0));
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      number: r.number,
+      date: r.date.toISOString().slice(0, 10),
+      party: nameById.get(r.customerLedgerId) ?? "—",
+      receivedIn: nameById.get(r.paymentLedgerId) ?? "—",
+      against: r.againstDoc?.number ?? "On account",
+      paymentMode: r.paymentMode,
+      reference: r.reference ?? "—",
+      amount: r2(D(r.amount)),
+    })),
+    totalAmount: r2(total),
+  };
+}
+
+export async function paymentsReport(companyId: string, fiscalYearId: string, opts: { from: Date; to: Date }) {
+  const rows = await db.supplierPayment.findMany({
+    where: { companyId, fiscalYearId, date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    select: {
+      id: true, number: true, date: true, amount: true, paymentMode: true, reference: true,
+      supplierLedgerId: true, paymentLedgerId: true, againstDoc: { select: { number: true } },
+    },
+  });
+  const ledgerIds = [...new Set(rows.flatMap((r) => [r.supplierLedgerId, r.paymentLedgerId]))];
+  const ledgers = ledgerIds.length
+    ? await db.ledger.findMany({ where: { id: { in: ledgerIds } }, select: { id: true, name: true } })
+    : [];
+  const nameById = new Map(ledgers.map((l) => [l.id, l.name]));
+  const total = rows.reduce((a, r) => a.add(r.amount), D(0));
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      number: r.number,
+      date: r.date.toISOString().slice(0, 10),
+      party: nameById.get(r.supplierLedgerId) ?? "—",
+      paidFrom: nameById.get(r.paymentLedgerId) ?? "—",
+      against: r.againstDoc?.number ?? "On account",
+      paymentMode: r.paymentMode,
+      reference: r.reference ?? "—",
+      amount: r2(D(r.amount)),
+    })),
+    totalAmount: r2(total),
+  };
+}
+
+/* ──────────────────────────  Monthly Tax Summary  ───────────────────────── */
+
+/** Output/Input VAT bucketed by calendar month across a range — the same
+ * inputs as vatReturn(), grouped monthly instead of totalled for one period. */
+export async function monthlyTaxSummary(companyId: string, fiscalYearId: string, opts: { from: Date; to: Date }) {
+  const [sales, purchases] = await Promise.all([
+    db.salesDoc.findMany({
+      where: { companyId, fiscalYearId, type: { in: ["INVOICE", "CREDIT_NOTE"] }, date: { gte: opts.from, lte: opts.to } },
+      select: { date: true, type: true, taxableTotal: true, nonTaxableTotal: true, vatAmount: true },
+    }),
+    db.purchaseDoc.findMany({
+      where: { companyId, fiscalYearId, type: { in: ["INVOICE", "DEBIT_NOTE"] }, date: { gte: opts.from, lte: opts.to } },
+      select: { date: true, type: true, taxableTotal: true, nonTaxableTotal: true, vatAmount: true },
+    }),
+  ]);
+
+  type Bucket = { salesTaxable: Prisma.Decimal; salesVat: Prisma.Decimal; purchaseTaxable: Prisma.Decimal; purchaseVat: Prisma.Decimal };
+  const byMonth = new Map<string, Bucket>();
+  const get = (d: Date) => {
+    const key = d.toISOString().slice(0, 7); // "YYYY-MM"
+    if (!byMonth.has(key)) byMonth.set(key, { salesTaxable: D(0), salesVat: D(0), purchaseTaxable: D(0), purchaseVat: D(0) });
+    return byMonth.get(key)!;
+  };
+  for (const s of sales) {
+    const b = get(s.date);
+    const sign = s.type === "CREDIT_NOTE" ? -1 : 1;
+    b.salesTaxable = b.salesTaxable.add(D(s.taxableTotal).mul(sign));
+    b.salesVat = b.salesVat.add(D(s.vatAmount).mul(sign));
+  }
+  for (const p of purchases) {
+    const b = get(p.date);
+    const sign = p.type === "DEBIT_NOTE" ? -1 : 1;
+    b.purchaseTaxable = b.purchaseTaxable.add(D(p.taxableTotal).mul(sign));
+    b.purchaseVat = b.purchaseVat.add(D(p.vatAmount).mul(sign));
+  }
+
+  const rows = [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, b]) => ({
+      month,
+      salesTaxable: r2(b.salesTaxable),
+      outputVat: r2(b.salesVat),
+      purchaseTaxable: r2(b.purchaseTaxable),
+      inputVat: r2(b.purchaseVat),
+      netPayable: r2(b.salesVat.sub(b.purchaseVat)),
+    }));
+  return { rows };
+}
+
+/* ──────────────────────────────  Activity Log  ──────────────────────────── */
+
+export async function activityLog(
+  companyId: string,
+  opts: { from?: Date; to?: Date; userId?: string; action?: string; page?: number; pageSize?: number },
+) {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(100, opts.pageSize ?? 30);
+  const where: Prisma.AuditLogWhereInput = {
+    companyId,
+    ...(opts.from || opts.to ? { createdAt: { ...(opts.from ? { gte: opts.from } : {}), ...(opts.to ? { lte: opts.to } : {}) } } : {}),
+    ...(opts.userId ? { userId: opts.userId } : {}),
+    ...(opts.action ? { action: opts.action } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true, action: true, entity: true, entityId: true, ip: true, createdAt: true,
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
+    }),
+    db.auditLog.count({ where }),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      at: r.createdAt.toISOString(),
+      user: r.user ? `${r.user.firstName} ${r.user.lastName}`.trim() : "System",
+      email: r.user?.email ?? "",
+      action: r.action,
+      entity: r.entity ?? "",
+      entityId: r.entityId ?? "",
+      ip: r.ip ?? "",
+    })),
+    total,
+    page,
+    pageSize,
+  };
+}
+
+/* ────────────────────────────  Sales Profit  ────────────────────────────── */
+
+/** Gross profit per invoice: ex-VAT sales value minus the COGS voucher
+ * postVoucher() already writes at weighted-average cost (SalesDoc.cogsVoucherId) —
+ * no separate cost calculation, just reads back what was posted at sale time. */
+export async function salesProfitReport(companyId: string, fiscalYearId: string, opts: { from: Date; to: Date }) {
+  const docs = await db.salesDoc.findMany({
+    where: { companyId, fiscalYearId, type: "INVOICE", date: { gte: opts.from, lte: opts.to } },
+    orderBy: [{ date: "asc" }, { number: "asc" }],
+    select: { id: true, number: true, date: true, customerName: true, taxableTotal: true, nonTaxableTotal: true, cogsVoucherId: true },
+  });
+  const voucherIds = docs.map((d) => d.cogsVoucherId).filter((id): id is string => !!id);
+  const cogsLines = voucherIds.length
+    ? await db.voucherLine.groupBy({ by: ["voucherId"], where: { voucherId: { in: voucherIds }, debit: { gt: 0 } }, _sum: { debit: true } })
+    : [];
+  const cogsByVoucher = new Map(cogsLines.map((l) => [l.voucherId, D(l._sum.debit ?? 0)]));
+
+  let totalSales = D(0);
+  let totalCogs = D(0);
+  const rows = docs.map((d) => {
+    const sales = D(d.taxableTotal).add(d.nonTaxableTotal);
+    const cogs = d.cogsVoucherId ? cogsByVoucher.get(d.cogsVoucherId) ?? D(0) : D(0);
+    const profit = sales.sub(cogs);
+    totalSales = totalSales.add(sales);
+    totalCogs = totalCogs.add(cogs);
+    return {
+      id: d.id,
+      number: d.number,
+      date: d.date.toISOString().slice(0, 10),
+      party: d.customerName ?? "—",
+      sales: r2(sales),
+      cogs: r2(cogs),
+      profit: r2(profit),
+      marginPct: sales.gt(0) ? profit.div(sales).mul(100).toDecimalPlaces(1).toFixed(1) : "0.0",
+    };
+  });
+
+  const totalProfit = totalSales.sub(totalCogs);
+  return {
+    rows,
+    totals: {
+      sales: r2(totalSales),
+      cogs: r2(totalCogs),
+      profit: r2(totalProfit),
+      marginPct: totalSales.gt(0) ? totalProfit.div(totalSales).mul(100).toDecimalPlaces(1).toFixed(1) : "0.0",
+    },
+  };
+}

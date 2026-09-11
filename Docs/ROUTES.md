@@ -19,14 +19,28 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
 | `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | list + entry form (uses shared `voucher-workspace`) |
 | `/dashboard/vouchers/stock-journal` | A · `vouchers.stock_journal` | Stock Journal | list + entry form; posts GL value gain/loss (`COS-01-0003`) + stock movement, distinct from Inventory Adjustment (qty-only, no GL) |
+| `/dashboard/reports` | A | Reports catalogue | clone of the reference app's report catalogue — 8 permission-scoped groups, ~20 reports, client-side Favourites pinning (localStorage) |
+| `/dashboard/reports/accounting/transaction-list` | A · `reports.accounting_reports` | Transaction List | every posted GL line, date range + ledger filter, paginated |
+| `/dashboard/reports/accounting/general-ledger-summary` | A · `reports.accounting_reports` | General Ledger Summary | per-ledger opening/debit/credit/closing for a date range (vs. Trial Balance's cumulative as-of) |
 | `/dashboard/reports/accounting/trial-balance` | A · `reports.accounting_reports` | Trial Balance | grouped, print |
-| `/dashboard/reports/accounting/ledger` | A · `reports.accounting_reports` | Ledger Report | `LedgerPicker` + running statement |
+| `/dashboard/reports/accounting/contra-report` | A · `reports.accounting_reports` | Contra Report | read-only Contra voucher report, date range, expand-to-lines |
 | `/dashboard/reports/accounting/profit-loss` | A · `reports.accounting_reports` | Profit & Loss | date range, grouped by account head |
-| `/dashboard/reports/accounting/balance-sheet` | A · `reports.accounting_reports` | Balance Sheet | as-of date; ties via Current Year Profit line |
 | `/dashboard/reports/accounting/day-book` | A · `reports.accounting_reports` | Day Book | single date, full voucher/line detail |
-| `/dashboard/reports/tax/vat-return` | A · `reports.tax_reports` | VAT Return | output vs input VAT, date range |
-| `/dashboard/reports/receivable/aging` | A · `reports.receivable_reports` | Receivable Aging | 0-30/31-60/61-90/90+ buckets by customer |
+| `/dashboard/reports/accounting/ledger` | A · `reports.accounting_reports` | Ledger Report | `LedgerPicker` + running statement |
+| `/dashboard/reports/accounting/journal-report` | A · `reports.accounting_reports` | Journal Report | read-only Journal voucher report, date range, expand-to-lines |
+| `/dashboard/reports/accounting/balance-sheet` | A · `reports.accounting_reports` | Balance Sheet | as-of date; ties via Current Year Profit line |
+| `/dashboard/reports/sales/sales-report` | A · `reports.sales_reports` | Sales Report | date range, PAN+VAT columns (doubles as the Tax variant), click-through to invoice detail |
+| `/dashboard/reports/sales/sales-profit-report` | A · `reports.sales_reports` | Sales Profit Report | per-invoice gross profit, reading back the COGS voucher `postVoucher` already wrote at sale time |
+| `/dashboard/reports/sales/sales-return-report` | A · `reports.sales_reports` | Sales Return Report | Credit Notes, date range |
+| `/dashboard/reports/sales/receipt-report` | A · `reports.sales_reports` | Receipt Report | Receipts, date range |
+| `/dashboard/reports/purchase/purchase-report` | A · `reports.purchase_reports` | Purchase Report | date range, PAN+VAT columns, click-through to purchase invoice detail |
+| `/dashboard/reports/purchase/purchase-return-report` | A · `reports.purchase_reports` | Purchase Return Report | Debit Notes, date range |
+| `/dashboard/reports/purchase/payment-report` | A · `reports.purchase_reports` | Payment Report | Supplier Payments, date range |
+| `/dashboard/reports/receivable/aging` | A · `reports.receivable_reports` | Receivable Aging | 0-30/31-60/61-90/90+ buckets by customer (also serves as "Customer Aging Report") |
 | `/dashboard/reports/payable/aging` | A · `reports.payable_reports` | Payable Aging | 0-30/31-60/61-90/90+ buckets by supplier |
+| `/dashboard/reports/system/activity-log` | A · `reports.system_reports` | Activity Log | `AuditLog` viewer, date range, paginated |
+| `/dashboard/reports/tax/vat-return` | A · `reports.tax_reports` | VAT Return | output vs input VAT, date range |
+| `/dashboard/reports/tax/monthly-tax-summary` | A · `reports.tax_reports` | Monthly Tax Summary | output/input VAT bucketed by calendar month |
 | `/dashboard/help/getting-started` | A · `help.user_manuals` | Getting Started | orientation, key concepts, first-login checklist |
 | `/dashboard/help/accounts-gl` | A · `help.user_manuals` | Accounts & GL manual | COA hierarchy, double-entry, T-account diagram |
 | `/dashboard/help/sales` | A · `help.user_manuals` | Sales manual | document chain, worked GL example |
@@ -133,6 +147,16 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/reports/vat-return` | A · `reports.tax_reports` read | `?from&to`; output/input VAT + taxable sales/purchase net of returns |
 | GET | `/api/reports/aging/receivable` | A · `reports.receivable_reports` read | `?asOf`; outstanding Sales Invoices net of Credit Notes, bucketed |
 | GET | `/api/reports/aging/payable` | A · `reports.payable_reports` read | `?asOf`; outstanding Purchase Invoices net of Debit Notes, bucketed |
+| GET | `/api/reports/transaction-list` | A · `reports.accounting_reports` read | `?from&to&ledgerId&page`; every posted GL line, paginated |
+| GET | `/api/reports/general-ledger-summary` | A · `reports.accounting_reports` read | `?from&to`; per-ledger opening/debit/credit/closing |
+| GET | `/api/reports/voucher-report` | A · `reports.accounting_reports` read | `?type=JOURNAL\|CONTRA&from&to`; read-only voucher report (no Vouchers-module permission needed) |
+| GET | `/api/reports/sales-report` | A · `reports.sales_reports` read | `?type=INVOICE\|CREDIT_NOTE&from&to` |
+| GET | `/api/reports/sales-profit` | A · `reports.sales_reports` read | `?from&to`; per-invoice gross profit from the COGS voucher already posted at sale time |
+| GET | `/api/reports/purchase-report` | A · `reports.purchase_reports` read | `?type=INVOICE\|DEBIT_NOTE&from&to` |
+| GET | `/api/reports/receipts` | A · `reports.sales_reports` read | `?from&to` |
+| GET | `/api/reports/payments` | A · `reports.purchase_reports` read | `?from&to` |
+| GET | `/api/reports/monthly-tax-summary` | A · `reports.tax_reports` read | `?from&to`; output/input VAT bucketed by calendar month |
+| GET | `/api/reports/activity-log` | A · `reports.system_reports` read | `?from&to&userId&action&page`; reads `AuditLog` |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 
