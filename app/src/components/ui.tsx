@@ -172,13 +172,38 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 
 export function toast(msg: string, kind: "ok" | "err" = "ok") {
   if (typeof document === "undefined") return;
+  const reduceMotion = document.documentElement.dataset.reduceMotion === "true";
+
+  const stack =
+    document.getElementById("app-toast-stack") ??
+    (() => {
+      const s = document.createElement("div");
+      s.id = "app-toast-stack";
+      s.className =
+        "fixed left-1/2 top-20 z-[100] flex -translate-x-1/2 flex-col items-center gap-2";
+      document.body.appendChild(s);
+      return s;
+    })();
+
   const el = document.createElement("div");
-  el.textContent = msg;
-  el.className = `fixed bottom-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${
-    kind === "ok" ? "bg-success" : "bg-danger"
-  }`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2600);
+  el.className = [
+    "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-lg",
+    kind === "ok" ? "bg-success" : "bg-danger",
+    reduceMotion ? "" : "app-toast-enter",
+  ].join(" ");
+  el.innerHTML = `<span aria-hidden="true">${kind === "ok" ? "✓" : "⚠"}</span>`;
+  el.appendChild(document.createTextNode(msg));
+  stack.appendChild(el);
+
+  setTimeout(() => {
+    if (!reduceMotion) {
+      el.classList.add("app-toast-exit");
+      el.addEventListener("animationend", () => el.remove(), { once: true });
+    } else {
+      el.remove();
+    }
+    if (!stack.hasChildNodes()) stack.remove();
+  }, 2600);
 }
 
 /** Small typed fetch wrapper for the API envelope. */

@@ -1,9 +1,16 @@
 @import "tailwindcss";
 
 /*
-  Design tokens derived from the reference app (Docs/DISCOVERY-LOG.md):
-  accent #00A8E8 · app bg #F0F0F0 · surface #fff · text #00171F · DM Sans · radius 8px
+  Design tokens. Base palette follows Bela Nepal Industries' own brand mark
+  (navy + orange) rather than the reference app's arbitrary cyan — the cyan
+  survives only as a selectable accent preset ("Ocean"), see below.
+
+  Theme (light/dark/system), accent color, font family, text size, and
+  reduce-motion are all switched purely via data-attributes on <html>, set by
+  src/lib/preferences.tsx. A tiny inline script in src/app/layout.tsx applies
+  the stored choice BEFORE first paint (no flash of the wrong theme).
 */
+
 :root {
   color-scheme: light;
   --background: #f0f0f0;
@@ -11,12 +18,95 @@
   --foreground: #00171f;
   --muted: #5b6b70;
   --border: #e2e5e7;
-  --accent: #00a8e8;
+  --accent: #f5821f;
   --accent-foreground: #ffffff;
-  --accent-tint: rgba(0, 168, 232, 0.08);
+  --accent-tint: rgba(245, 130, 31, 0.1);
   --danger: #e5484d;
   --success: #30a46c;
+  --brand-navy: #16213e;
+  --brand-navy-foreground: #ffffff;
   --radius: 8px;
+  --font-scale: 1;
+}
+
+/* ── Accent presets (light) ─────────────────────────────────────────── */
+:root[data-accent="orange"] {
+  --accent: #f5821f;
+  --accent-tint: rgba(245, 130, 31, 0.1);
+}
+:root[data-accent="ocean"] {
+  --accent: #00a8e8;
+  --accent-tint: rgba(0, 168, 232, 0.1);
+}
+:root[data-accent="forest"] {
+  --accent: #16a34a;
+  --accent-tint: rgba(22, 163, 74, 0.1);
+}
+:root[data-accent="violet"] {
+  --accent: #7c3aed;
+  --accent-tint: rgba(124, 58, 237, 0.12);
+}
+:root[data-accent="rose"] {
+  --accent: #e11d48;
+  --accent-tint: rgba(225, 29, 72, 0.1);
+}
+
+/* ── Dark mode: system preference, unless explicitly overridden ────────
+   Guard against [data-theme="light"] so an explicit light choice always
+   wins over the OS setting; the explicit [data-theme="dark"] block below
+   wins in both directions. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #0a0e17;
+    --surface: #121826;
+    --foreground: #eef1f5;
+    --muted: #8b95a7;
+    --border: #232a3b;
+    --accent-foreground: #ffffff;
+    --danger: #ff6b70;
+    --success: #3ddb8f;
+    --brand-navy: #1b2a4a;
+  }
+  :root:not([data-theme="light"])[data-accent="orange"] { --accent-tint: rgba(245, 130, 31, 0.18); }
+  :root:not([data-theme="light"])[data-accent="ocean"] { --accent-tint: rgba(0, 168, 232, 0.18); }
+  :root:not([data-theme="light"])[data-accent="forest"] { --accent-tint: rgba(22, 163, 74, 0.18); }
+  :root:not([data-theme="light"])[data-accent="violet"] { --accent-tint: rgba(124, 58, 237, 0.2); }
+  :root:not([data-theme="light"])[data-accent="rose"] { --accent-tint: rgba(225, 29, 72, 0.18); }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0a0e17;
+  --surface: #121826;
+  --foreground: #eef1f5;
+  --muted: #8b95a7;
+  --border: #232a3b;
+  --accent-foreground: #ffffff;
+  --danger: #ff6b70;
+  --success: #3ddb8f;
+  --brand-navy: #1b2a4a;
+}
+:root[data-theme="dark"][data-accent="orange"] { --accent-tint: rgba(245, 130, 31, 0.18); }
+:root[data-theme="dark"][data-accent="ocean"] { --accent-tint: rgba(0, 168, 232, 0.18); }
+:root[data-theme="dark"][data-accent="forest"] { --accent-tint: rgba(22, 163, 74, 0.18); }
+:root[data-theme="dark"][data-accent="violet"] { --accent-tint: rgba(124, 58, 237, 0.2); }
+:root[data-theme="dark"][data-accent="rose"] { --accent-tint: rgba(225, 29, 72, 0.18); }
+
+/* ── Text size (scales the rem baseline every Tailwind class reads from) ─ */
+html[data-text-size="sm"] { font-size: 93.75%; } /* 15px */
+html[data-text-size="md"] { font-size: 100%; }   /* 16px — default */
+html[data-text-size="lg"] { font-size: 106.25%; } /* 17px */
+html[data-text-size="xl"] { font-size: 112.5%; } /* 18px */
+
+/* ── Reduce motion ───────────────────────────────────────────────────── */
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 @theme inline {
@@ -30,26 +120,60 @@
   --color-accent-tint: var(--accent-tint);
   --color-danger: var(--danger);
   --color-success: var(--success);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-foreground: var(--brand-navy-foreground);
   --font-sans:
-    "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    var(--font-active, var(--font-dm-sans)), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
   --radius-DEFAULT: var(--radius);
 }
 
+/* ── Font family presets — each maps to a next/font variable from layout.tsx ── */
+:root[data-font="dm-sans"] { --font-active: var(--font-dm-sans); }
+:root[data-font="inter"] { --font-active: var(--font-inter); }
+:root[data-font="poppins"] { --font-active: var(--font-poppins); }
+:root[data-font="noto-sans"] { --font-active: var(--font-noto-sans); }
+
 * {
   border-color: var(--border);
+}
+
+html {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: calc(0.875rem * var(--font-scale, 1));
   -webkit-font-smoothing: antialiased;
 }
 
-/*
-  The reference application is light-mode only for the back-office ("Default
-  storefront mode is always Light"). A dark theme can be added later behind an
-  explicit toggle; we do not follow the OS preference here so the clone matches
-  the reference exactly. See Docs/ASSUMPTIONS.md.
-*/
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+/* ── Toast stack animation ───────────────────────────────────────────── */
+@keyframes app-toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes app-toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-10px) scale(0.96); }
+}
+.app-toast-enter { animation: app-toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.app-toast-exit { animation: app-toast-out 0.18s ease-in forwards; }
+
+/* ── Branded loading spinner (src/app/loading.tsx and friends) ──────────── */
+@keyframes brand-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.92); opacity: 0.7; }
+}
+.brand-pulse { animation: brand-pulse 1.6s ease-in-out infinite; }
+
+html[data-reduce-motion="true"] .brand-pulse { animation: none; }

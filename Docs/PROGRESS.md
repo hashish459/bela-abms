@@ -13,6 +13,87 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 15 — 2026-09-11 (Branding + theming/accessibility + status pages)
+Cross-cutting UI/UX pass, client-requested directly (not a v1 accounting module):
+real company branding (Bela Nepal Industries' own navy/orange logo, replacing the
+reference app's arbitrary cyan), a full appearance/accessibility system (theme, accent,
+font, text size, reduce-motion, language), custom 404/error pages, branded loading
+screens, and a toast-position fix.
+
+- **Branding — blocked on one file.** The client attached their logo inline in chat;
+  Claude Code has no mechanism to extract image bytes from a chat message into a file
+  (Read only reads files that already exist on disk) — asked the client to save it to
+  `app/public/logo.png`. Built `src/components/brand-logo.tsx` (`<BrandLogo>`) so every
+  placement (login, sidebar header, 404, loading, global-error) picks it up with zero
+  further code changes the moment the file lands, no crop (object-contain, native aspect
+  ratio, matches the "use it exactly as-is" instruction) — falls back to the old "ब"
+  lettermark chip until then, so the app never looks broken in the interim. **Found and
+  fixed a real bug while building this:** using the rendered `<img>`'s own `onError` fails
+  for an SSR'd image — the browser starts the request the instant it parses the HTML,
+  before React hydrates and attaches the handler, so a fast 404 is missed and the
+  browser's broken-image glyph is left on screen. Fixed by probing with a detached
+  `new Image()` in a `useEffect` instead, decoupled from the actually-rendered tag.
+- **Removed unused `create-next-app` starter SVGs** from `public/` (file/globe/next/
+  vercel/window.svg — never referenced anywhere).
+- **Theme/accent/font/text-size/language system** (`src/lib/preferences.tsx`,
+  `src/lib/i18n.ts`, `src/components/appearance-panel.tsx`): light/dark/system (a
+  blocking inline `<script>` in `layout.tsx`'s `<head>` applies the saved choice before
+  first paint — no flash of the wrong theme for returning visitors), 5 accent presets
+  (Bela Orange is now the *default*, replacing the reference's cyan, which survives as
+  the "Ocean" preset), 4 fonts (DM Sans/Inter/Poppins/Noto Sans, the latter for
+  Devanagari coverage), 4 text sizes (scales the `<html>` root `%`, so every Tailwind
+  rem-based class across the whole app scales — not just a handful of hand-picked
+  components), a reduce-motion toggle, and English/नेपाली. All switched purely via
+  `data-*` attributes on `<html>`, all persisted to `localStorage`, surfaced via a
+  palette-icon panel in the dashboard header *and* on the login page (so appearance can
+  be set before authenticating). **Found and fixed a real persistence bug**: the
+  "save prefs to storage" effect fired on mount with default values before the
+  "load prefs from storage" effect's deferred read could run, silently over-writing every
+  returning visitor's saved choices back to defaults on every page load — fixed by
+  gating the save effect on a `hydrated` flag set only after the load has completed.
+  Verified via direct `localStorage`/attribute inspection (not just screenshots, which
+  intermittently rendered stale frames in this session's browser tool) that a full set of
+  non-default choices survives a hard page reload correctly.
+- **Language scope, stated honestly**: translates the app's chrome only — shell
+  (sidebar/header labels, sign out), the login page, the Appearance panel itself, and the
+  404/error pages. Translating every dashboard module's own content (30+ pages) is a
+  much larger follow-up not attempted here; those pages render in English regardless of
+  the language setting until that work happens. Documented in `src/lib/i18n.ts` itself so
+  a future session doesn't assume more coverage exists than actually does.
+- **Custom status pages**: `src/app/not-found.tsx` (checks session server-side to decide
+  "Back to Dashboard" vs "Back to Login"), `src/app/error.tsx` (client, `reset()` wired to
+  a retry button), `src/app/global-error.tsx` (catches a crash in the root layout itself —
+  deliberately self-contained with its own `<html>/<body>`, since it fully replaces the
+  root layout including `PreferencesProvider` and the theme-init script; renders in
+  default light styling on purpose, prioritizing "definitely works even when everything
+  else is broken" over full theming). All on-brand: logo, accent-tinted glow, pulsing
+  compass icon for 404.
+- **Branded loading**: `src/app/loading.tsx` (full-page splash, shown before the app
+  shell itself has resolved — e.g. first navigation or hard refresh) and
+  `src/app/(app)/loading.tsx` (a lighter inline version shown inside the shell — sidebar/
+  header stay visible — while an individual dashboard page's own data is loading).
+- **Toast position fix** (the client's actual ask: "info popup box... currently is
+  center bottom"): moved from `bottom-4` to a `top-20` stack (clears the 56px dashboard
+  header with room to spare), rewrote `toast()` in `src/components/ui.tsx` to support
+  multiple simultaneous toasts stacking vertically instead of overlapping (a latent bug
+  in the original single-fixed-position implementation), added a check/warning icon and
+  a fade+slide entrance/exit animation gated behind the new reduce-motion preference.
+- tsc + eslint + build + 38/38 existing tests green (no server-side logic touched this
+  session — purely client-side presentation/UX — so no new Vitest coverage needed).
+  Verified live: dark mode, all 5 accents, all 4 fonts, all 4 text sizes, reduce motion,
+  both languages, the 404 page, and toast stacking — all confirmed via a mix of
+  screenshots and direct DOM/localStorage inspection (screenshots proved unreliable/stale
+  intermittently in this session's browser tool; state inspection caught real bugs the
+  screenshots initially masked).
+- **Gaps / follow-ups**: logo file still pending from the client; no favicon/`app/icon.png`
+  update yet (needs the same source art — once `public/logo.png` exists, a matching
+  `src/app/icon.png` can replace the generic Next.js favicon); dashboard content
+  (non-chrome page text) is not translated; no "Appearance" entry under Settings itself
+  (the header/login panel is the only surface — considered sufficient for now, easy to
+  duplicate onto a Settings sub-page later if wanted); no true multi-tenant per-user
+  server-persisted preference (this is `localStorage`-only, per-browser, matching how the
+  system currently has no per-user profile settings storage at all).
+
 ### Session 14 — 2026-09-11 (Workshop vertical)
 Third industry vertical. Same "reference nav exposed almost nothing" situation as Fixed
 Assets and Manufacturing (Docs/DISCOVERY-LOG.md only ever surfaced "workshop job card /

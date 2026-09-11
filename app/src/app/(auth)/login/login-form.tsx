@@ -3,8 +3,20 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
+
+export function LoginHeader() {
+  const { t } = useTranslation();
+  return (
+    <>
+      <h2 className="mb-1 text-xl font-semibold">{t("loginTitle")}</h2>
+      <p className="mb-5 text-sm text-muted">{t("loginSubtitle")}</p>
+    </>
+  );
+}
 
 export function LoginForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/dashboard";
@@ -45,7 +57,7 @@ export function LoginForm() {
         type="email"
         required
         autoComplete="email"
-        placeholder="Email address"
+        placeholder={t("emailAddress")}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg bg-background px-3 py-2.5 text-sm outline-none ring-1 ring-border focus:ring-2 focus:ring-accent"
@@ -55,7 +67,7 @@ export function LoginForm() {
           type={show ? "text" : "password"}
           required
           autoComplete="current-password"
-          placeholder="Password"
+          placeholder={t("password")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full rounded-lg bg-background px-3 py-2.5 pr-10 text-sm outline-none ring-1 ring-border focus:ring-2 focus:ring-accent"
@@ -82,7 +94,7 @@ export function LoginForm() {
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-foreground transition hover:brightness-95 disabled:opacity-60"
       >
         {loading && <Loader2 size={16} className="animate-spin" />}
-        {loading ? "Signing in…" : "Login"}
+        {loading ? t("loading") : t("login")}
       </button>
     </form>
   );

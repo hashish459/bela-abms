@@ -33,6 +33,9 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MenuNode } from "@/lib/menu";
+import { BrandLogo } from "@/components/brand-logo";
+import { AppearancePanel } from "@/components/appearance-panel";
+import { useTranslation } from "@/lib/i18n";
 
 type User = {
   name: string;
@@ -101,6 +104,7 @@ export function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
@@ -111,9 +115,7 @@ export function AppShell({
         }`}
       >
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-            ब
-          </div>
+          <BrandLogo size={34} />
           <span className="text-sm font-bold tracking-wide">
             BELA <span className="font-normal text-muted">ABMS</span>
           </span>
@@ -155,18 +157,19 @@ export function AppShell({
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
             />
             <input
-              placeholder="Search"
+              placeholder={t("search")}
               className="w-full rounded-lg bg-background py-1.5 pl-9 pr-3 text-sm outline-none ring-1 ring-border focus:ring-2 focus:ring-accent"
             />
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <span className="flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1 text-xs font-medium ring-1 ring-border">
+            <span className="hidden items-center gap-1.5 rounded-lg bg-background px-2.5 py-1 text-xs font-medium ring-1 ring-border sm:flex">
               <CalendarDays size={13} className="text-muted" />
               {fiscalYear}
             </span>
-            <button className="relative text-muted hover:text-foreground" aria-label="Notifications">
+            <button className="relative text-muted hover:text-foreground" aria-label={t("notifications")}>
               <Bell size={18} />
             </button>
+            <AppearancePanel />
             <UserMenu user={user} company={company} />
           </div>
         </header>
@@ -238,6 +241,7 @@ function NavItem({
 function UserMenu({ user, company }: { user: User; company: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { t } = useTranslation();
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -271,7 +275,7 @@ function UserMenu({ user, company }: { user: User; company: string }) {
               <p className="mt-1 text-xs">
                 {user.isAdmin ? (
                   <span className="rounded bg-accent-tint px-1.5 py-0.5 text-accent">
-                    Admin
+                    {t("admin")}
                   </span>
                 ) : (
                   user.roleNames.map((r) => (
@@ -289,7 +293,7 @@ function UserMenu({ user, company }: { user: User; company: string }) {
               onClick={logout}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger hover:bg-danger/10"
             >
-              <LogOut size={15} /> Sign out
+              <LogOut size={15} /> {t("signOut")}
             </button>
           </div>
         </>
