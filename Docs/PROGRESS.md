@@ -13,6 +13,55 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 14 — 2026-09-11 (Workshop vertical)
+Third industry vertical. Same "reference nav exposed almost nothing" situation as Fixed
+Assets and Manufacturing (Docs/DISCOVERY-LOG.md only ever surfaced "workshop job card /
+technician" from the 76-model list) — but this one turned out to need **zero new ledgers**,
+because a Job Card is architecturally just a pre-financial working document (like Quotation/
+SalesOrder) that becomes a real Sales Invoice on completion, by calling
+`src/server/sales/service.ts`'s exported `createInvoice()` **directly** rather than
+reimplementing any billing/GL/stock/COGS/VAT logic.
+
+- Prisma: `Technician` (simple master data), `JobCard` + `JobCardItem` (customer/vehicle/
+  complaint intake + an *optional* estimate). New enums `JobCardStatus`
+  (OPEN/BILLED/CANCELLED) and `JobCardItemType` (PART/LABOR — a workshop-internal grouping
+  only, has no bearing on how a line posts once billed). 1 migration. No changes to Sales,
+  Purchase, or any other already-shipped module — this vertical is purely additive, calling
+  existing exported functions rather than touching their internals.
+- **Key design decision:** the job card's stored `items` are the *original intake estimate*
+  only. "Complete & Bill" takes a **separate, fresh** items array (what was actually done —
+  real repair work often differs from the initial estimate once the vehicle is inspected) and
+  passes it straight through to `createInvoice()`; nothing gets copied back onto the `JobCard`
+  row. The detail UI links a BILLED job card to Sales › Sales Invoice to see the real charge,
+  since no per-invoice detail/print page exists yet (a pre-existing gap from session 7, not
+  new here).
+- **`src/server/workshop/service.ts`**: `createJobCard` (validates any referenced products/
+  technicians exist; customer is a ledger or a walk-in name, matching Sales' own pattern
+  exactly). `billJobCard` — the entire "posting" logic is one call to `createInvoice()` with
+  the job card's customer info and the final items translated into invoice lines (PART lines
+  optionally carry a GOODS `productId` and consume stock exactly like any sale; LABOR lines
+  behave like a SERVICE line, no stock). `cancelJobCard` for OPEN cards that never proceed —
+  trivial, since nothing was ever posted to the GL.
+- API: `/api/workshop/{technicians[/id],job-cards[/id],job-cards/[id]/bill,job-cards/[id]/cancel}`.
+  New permission group `workshop` (`job_card`, `technician`) — not granted to Cashier.
+- UI: new "Workshop" nav item → Job Card (list + intake form with an inline Parts/Labor items
+  editor shared between intake and billing + Complete & Bill + Cancel) + Technician (simple
+  list/add/edit, mirrors the existing Warehouse manager pattern exactly).
+- **Verified end-to-end via curl with hand-calculated numbers**: opened a job card for a
+  Toyota Hiace with a brake noise complaint (empty estimate, to test that path); billed it
+  with 2 Brake Pad Sets (a GOODS part, stock-tracked) + 2 hours of labor (a SERVICE product,
+  technician-attributed) at VAT 13% — the resulting Sales Invoice showed exactly
+  taxable 4,000.00 / VAT 520.00 / grand total 4,520.00 (hand-verified: 2×1500 + 2×500 = 4000,
+  ×13% = 520), status PAID with an auto-booked cash receipt (Sales' existing cash-sale
+  behavior, untouched), stock dropped exactly 20→18, and the job card correctly flipped to
+  BILLED with its `invoiceId` linked. Confirmed billing an already-CANCELLED job card is
+  rejected. tsc + eslint + build + 38/38 tests green (no new pure-calc tests needed — the only
+  workshop-specific math is a trivial display-only estimate sum; the real posting math is
+  100% Sales' already-tested `calcSalesTotals`). RBAC verified both ways.
+- **Gaps:** no job-card editing after creation (matches the existing Quotation/SalesOrder
+  precedent of create-once-then-convert, not a new limitation); no technician labor-cost/
+  commission reporting; no vehicle service-history lookup by registration number.
+
 ### Session 13 — 2026-09-11 (Manufacturing vertical)
 Second industry vertical. Same approach as Fixed Assets: the reference app's own nav never
 exposed a manufacturing workflow (Docs/DISCOVERY-LOG.md — "material bill = BOM,
@@ -486,8 +535,9 @@ Recommended order & why:
      ⬜ Annex 5/13 exact IRD formats (needs the CBMS pass) · ⬜ PDF/Excel export.
   8. **Dashboard** widgets — ✅ done session 11 (KPIs, sales trend chart, recent activity,
      fully permission-scoped).
-  9. **Verticals:** ✅ Fixed Assets (session 12) → ✅ Manufacturing (session 13) → ⬜ Workshop →
-     Restaurant → Fuel/Token → Printing, then **Documents**. *CRM, Budget, Store Builder = post-v1.*
+  9. **Verticals:** ✅ Fixed Assets (session 12) → ✅ Manufacturing (session 13) →
+     ✅ Workshop (session 14) → ⬜ Restaurant → Fuel/Token → Printing, then **Documents**.
+     *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls
   `postVoucher`/`postStockMovement`) → `/api/<domain>` routes (`requirePermission`) →
   UI page replacing the stub → Vitest (calc + posting) + Playwright (workflow).

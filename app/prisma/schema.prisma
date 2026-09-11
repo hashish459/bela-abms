@@ -51,6 +51,8 @@ model Company {
   depreciationRuns     DepreciationRun[]
   billOfMaterials      BillOfMaterial[]
   productionOrders     ProductionOrder[]
+  technicians          Technician[]
+  jobCards             JobCard[]
 }
 
 model Branch {
@@ -90,6 +92,7 @@ model FiscalYear {
   fixedAssets      FixedAsset[]
   depreciationRuns DepreciationRun[]
   productionOrders ProductionOrder[]
+  jobCards         JobCard[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -1206,6 +1209,94 @@ model ProductionOrderItem {
   order ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+/// ───────────────────────────────  WORKSHOP  ────────────────────────────
+/// Auto/repair vertical. A JobCard is a working document (like Quotation/SalesOrder — no
+/// GL/stock impact of its own) that becomes a real Sales Invoice on "Complete & Bill", by
+/// calling src/server/sales/service.ts's createInvoice() directly — reusing 100% of Sales'
+/// already-verified GL/stock/COGS/VAT logic instead of duplicating it. Parts consume stock
+/// and post COGS exactly like any other sale; labor lines behave like a SERVICE line (no
+/// stock). Technician assignment is workshop-internal bookkeeping only — the invoice itself
+/// has no notion of technicians.
+enum JobCardStatus {
+  OPEN
+  BILLED
+  CANCELLED
+}
+
+enum JobCardItemType {
+  PART
+  LABOR
+}
+
+model Technician {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  phone          String?
+  specialization String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+  deletedAt      DateTime?
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobItems JobCardItem[]
+
+  @@index([companyId])
+}
+
+model JobCard {
+  id           String   @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  number       String // "JC-2083/84-0001"
+  date         DateTime @db.Date
+
+  customerLedgerId String?
+  customerName     String?
+  customerPhone    String?
+
+  vehicleRegNo    String
+  vehicleMake     String?
+  vehicleModel    String?
+  odometerReading Decimal? @db.Decimal(18, 2)
+  complaint       String
+
+  status      JobCardStatus @default(OPEN)
+  invoiceId   String?       @unique
+  notes       String?
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear    @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  items      JobCardItem[]
+
+  @@unique([companyId, number])
+  @@index([companyId, status])
+  @@index([companyId, vehicleRegNo])
+}
+
+model JobCardItem {
+  id           String          @id @default(cuid())
+  jobCardId    String
+  itemType     JobCardItemType
+  productId    String?
+  technicianId String?
+  description  String
+  qty          Decimal         @db.Decimal(18, 3)
+  rate         Decimal         @db.Decimal(18, 4)
+  discount     Decimal         @default(0) @db.Decimal(18, 2)
+  taxRateId    String?
+  isNonTaxable Boolean         @default(false)
+  order        Int             @default(0)
+
+  jobCard    JobCard     @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  technician Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+
+  @@index([jobCardId])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────

@@ -190,6 +190,31 @@ the labor allowance scale linearly by `batches`; unit cost = `(materialCost + la
 outputQty`. Verified end-to-end via curl against hand-calculated numbers — see PROGRESS.md
 session 13.
 
+### Workshop — ✅ BUILT (session 14)
+The one vertical that needed **zero new ledgers**: a `JobCard` is a pre-financial working
+document (like Quotation/SalesOrder — no GL/stock impact of its own) that becomes a real
+Sales Invoice on "Complete & Bill" by calling `src/server/sales/service.ts`'s `createInvoice()`
+**directly** — reusing 100% of Sales' already-verified GL/stock/COGS/VAT logic rather than
+duplicating any of it. Parts (GOODS products) consume stock and post COGS exactly like any
+other sale; labor lines behave like a SERVICE line (no stock). Technician assignment is
+workshop-internal bookkeeping only — the resulting invoice has no notion of technicians.
+
+| Model | Notes |
+|---|---|
+| **`Technician`** | simple master data: name, phone, specialization, `isActive` |
+| **`JobCard` + `JobCardItem`** | intake record: customer (ledger or walk-in), vehicle reg/make/model/odometer, complaint, an *optional* estimate (`items`) captured at intake. `status` OPEN → BILLED (sets `invoiceId`) or → CANCELLED |
+
+**Key design point:** the job card's own `items` are the *original estimate* only — real repair
+work often differs once the vehicle is inspected, so "Complete & Bill" takes a **fresh** items
+array (the actuals) and passes it straight to `createInvoice()`; nothing is copied back onto
+the `JobCard` row. The UI links a billed job card to Sales › Sales Invoice to see what was
+actually charged, since no per-invoice detail page exists yet (a pre-existing gap, not new).
+
+Verified end-to-end via curl: 2 Brake Pad Sets (part, stock-tracked) + 2 hours labor (service,
+no stock) billed at VAT 13% produced exactly the hand-calculated Rs. 4,520.00 invoice
+(3000+1000 taxable, 520 VAT), consumed exactly 2 units of stock, and correctly auto-booked a
+cash receipt — all via the *unmodified* Sales invoicing path.
+
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·
 `crm target` · `visit history` · `location point` (field-sales GPS).

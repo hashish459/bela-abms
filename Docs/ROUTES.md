@@ -39,6 +39,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/fixed-assets/depreciation` | A · `fixed_assets.depreciation` | Depreciation | run history + "Run Depreciation" |
 | `/dashboard/manufacturing/bom` | A · `manufacturing.bill_of_materials` | Bill of Materials | list + add form (output + components + labor) |
 | `/dashboard/manufacturing/production-order` | A · `manufacturing.production_order` | Production Order | list + run form + detail (components consumed) |
+| `/dashboard/workshop/job-card` | A · `workshop.job_card` | Job Card | list + intake form (optional estimate) + Complete & Bill + Cancel |
+| `/dashboard/workshop/technician` | A · `workshop.technician` | Technician | list + add/edit form |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
@@ -115,6 +117,12 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/manufacturing/boms/[id]` | A · `manufacturing.bill_of_materials` read | detail with components |
 | GET/POST | `/api/manufacturing/production-orders` | A · `manufacturing.production_order` | list / run (consumes components at weighted-avg cost, posts Dr WIP→Finished / Cr Raw Material+Labor) |
 | GET | `/api/manufacturing/production-orders/[id]` | A · `manufacturing.production_order` read | detail with components consumed |
+| GET/POST | `/api/workshop/technicians` | A · `workshop.technician` | list / create |
+| PATCH | `/api/workshop/technicians/[id]` | A · `workshop.technician` update | edit / deactivate |
+| GET/POST | `/api/workshop/job-cards` | A · `workshop.job_card` | list / open (no GL/stock — a working document) |
+| GET | `/api/workshop/job-cards/[id]` | A · `workshop.job_card` read | detail with intake-estimate items |
+| POST | `/api/workshop/job-cards/[id]/bill` | A · `workshop.job_card` update | completes the job by calling Sales' `createInvoice()` directly |
+| POST | `/api/workshop/job-cards/[id]/cancel` | A · `workshop.job_card` update | cancels an OPEN job card (no GL impact ever existed) |
 | GET | `/api/reports/profit-loss` | A · `reports.accounting_reports` read | `?from&to`; income vs expense by account head |
 | GET | `/api/reports/balance-sheet` | A · `reports.accounting_reports` read | `?asOf`; assets vs liabilities+equity+current-year-profit |
 | GET | `/api/reports/day-book` | A · `reports.accounting_reports` read | `?date`; every voucher posted that day |

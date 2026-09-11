@@ -69,6 +69,11 @@ const PERMISSION_CATALOGUE: Array<{ key: string; name: string; modules: string[]
     modules: ["Bill of Materials", "Production Order"],
   },
   {
+    key: "workshop",
+    name: "Workshop",
+    modules: ["Job Card", "Technician"],
+  },
+  {
     key: "accounts",
     name: "Accounts",
     modules: ["Charts of Accounts", "Cash & Bank Account", "Contacts", "Balance Confirmation"],
@@ -200,6 +205,13 @@ const MENU: MenuSeed[] = [
     children: [
       { title: "Bill of Materials", route: "/dashboard/manufacturing/bom", permissionKey: "manufacturing.bill_of_materials" },
       { title: "Production Order", route: "/dashboard/manufacturing/production-order", permissionKey: "manufacturing.production_order" },
+    ],
+  },
+  {
+    title: "Workshop", route: "/dashboard/workshop/job-card", icon: "wrench",
+    children: [
+      { title: "Job Card", route: "/dashboard/workshop/job-card", permissionKey: "workshop.job_card" },
+      { title: "Technician", route: "/dashboard/workshop/technician", permissionKey: "workshop.technician" },
     ],
   },
   {

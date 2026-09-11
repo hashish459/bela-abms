@@ -28,6 +28,7 @@ import {
   Activity,
   Building2,
   Factory,
+  Wrench,
   Dot,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -78,6 +79,8 @@ function navIcon(name: string | null, size = 16): ReactNode {
       return <Building2 size={size} />;
     case "factory":
       return <Factory size={size} />;
+    case "wrench":
+      return <Wrench size={size} />;
     default:
       return <Dot size={size} />;
   }
