@@ -292,10 +292,18 @@ export async function createInvoice(
       ],
     });
 
-    // 3. COGS (perpetual): value goods lines at weighted-average cost
+    // 3. COGS (perpetual): value goods lines at weighted-average cost — one
+    // batched lookup per unique product (run concurrently), not one query
+    // per line item, so a 20-line invoice doesn't cost 20 sequential round trips.
+    const cogsProductIds = [...new Set(goodsLines.map((it) => it.productId!))];
+    const cogsCostByProduct = new Map(
+      await Promise.all(
+        cogsProductIds.map(async (pid) => [pid, await weightedAverageCost(companyId, pid, tx)] as const),
+      ),
+    );
     let totalCogs = D(0);
     for (const it of goodsLines) {
-      const cost = await weightedAverageCost(companyId, it.productId!, tx);
+      const cost = cogsCostByProduct.get(it.productId!)!;
       totalCogs = totalCogs.add(cost.mul(it.qty));
     }
     let cogsVoucherId: string | null = null;
@@ -523,11 +531,12 @@ export async function createCreditNote(
     const goodsLines = cn.items.filter(
       (it, i) => calcLines[i].productKind === "GOODS" && it.productId && it.warehouseId,
     );
-    const costByProduct = new Map<string, Prisma.Decimal>();
-    for (const it of goodsLines) {
-      if (!costByProduct.has(it.productId!))
-        costByProduct.set(it.productId!, await weightedAverageCost(companyId, it.productId!, tx));
-    }
+    const returnProductIds = [...new Set(goodsLines.map((it) => it.productId!))];
+    const costByProduct = new Map(
+      await Promise.all(
+        returnProductIds.map(async (pid) => [pid, await weightedAverageCost(companyId, pid, tx)] as const),
+      ),
+    );
     if (goodsLines.length) {
       await postStockMovement(tx, {
         companyId, fiscalYearId, date: new Date(input.date), kind: "SALES_RETURN",

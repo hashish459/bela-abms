@@ -13,6 +13,80 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 16 — 2026-09-11 (Enterprise Hardening pass — security + performance)
+The brief's own roadmap (`Docs/MASTER-PROMPT.md` §9, "Enterprise hardening") calls for
+exactly this phase once the modules are built — client asked to proceed with "modern
+corporate standards." Rather than guess what to harden, ran a real audit (Explore agent)
+against the brief's own checklist with file:line evidence for every claim, then fixed
+every genuine gap found. Full audit findings are in this session's transcript; summary:
+
+**Fixed:**
+- **CSRF protection** (`src/lib/cookies.ts` `csrfCookie()`, `src/lib/session.ts`
+  `issueSession()`, `src/lib/guard.ts` `assertCsrf()`): double-submit token, issued as a
+  readable (non-httpOnly) cookie at login/refresh alongside the existing httpOnly
+  access/refresh cookies. `guard()` now verifies the `x-csrf-token` header matches the
+  cookie for every non-`"read"` action — an attacker can make a victim's browser *send*
+  the cookie automatically but can't *read* it cross-origin to also set the matching
+  header. Defense-in-depth on top of the existing `SameSite=Lax`, which already blocks
+  most cross-site mutation attempts for this same-origin app. Client-side, `api()`
+  (`src/components/ui.tsx`) reads the cookie and attaches the header automatically — no
+  per-call-site changes needed anywhere. Verified via curl: missing token → 403, wrong
+  token → 403, correct token → succeeds, GET reads → unaffected (by design).
+- **Rate limiting on `POST /api/auth/refresh`** (`src/lib/rate-limit.ts`, new in-memory
+  fixed-window limiter — appropriate given this app's single-instance-per-company
+  deployment model, no Redis/horizontal scaling to coordinate): this was the one
+  unauthenticated-reachable endpoint with no throttle at all (login already had one via
+  `LoginAttempt`). 20 requests/min per IP. Verified via curl: 21st request in a minute
+  returns 429.
+- **N+1 query pattern in Sales COGS calculation** (`src/server/sales/service.ts`
+  `createInvoice` ~line 297, `createCreditNote` ~line 527): both loops called
+  `weightedAverageCost()` — itself a real DB query — once per LINE ITEM sequentially,
+  so a 20-line invoice cost 20 round trips. Fixed by deduping to unique product IDs and
+  batching the lookups through `Promise.all`, mirroring the pattern already used
+  correctly in `manufacturing/service.ts`'s BOM cost rollup. Verified: a multi-line
+  invoice still posts with correct COGS and the trial balance still balances exactly.
+- **5 Settings routes weren't using `guard()`** (`company-info`, `fiscal-years[/id]`,
+  `tax-rates[/id]`) — these predate `guard()` (added in session 5) and still inlined
+  `requireSession()`+`requirePermission()` directly, which meant they silently missed the
+  new CSRF check. Refactored all 5 to use `guard()` like every other route in the
+  codebase — closes the CSRF gap for them and removes the last inconsistency in how
+  routes check permissions.
+- **Missing composite index**: `BillOfMaterial` had only `@@index([companyId])` despite
+  having an `isActive` filterable field, unlike the matching pattern already used on
+  `FixedAsset`/`JobCard`. Added `@@index([companyId, isActive])` — preventive (today's
+  `listBoms` doesn't filter on `isActive` yet, but an "active only" toggle is an obvious
+  near-term addition and the index should already be there when it lands). 1 migration.
+- **Prisma error leakage (belt-and-suspenders)**: `handler()` (`src/lib/api.ts`) already
+  never leaked stack traces or raw error messages (confirmed by audit — this was already
+  fine), but unhandled Prisma errors all fell into one generic 500. Added a narrow
+  `PrismaClientKnownRequestError` branch mapping `P2002`→409 "already exists",
+  `P2025`→404 "not found", `P2003`→409 "conflicts with a related record" — friendlier
+  UX, still without ever echoing Prisma's own message or `meta` (which can name internal
+  column/table identifiers) back to the client.
+
+**Confirmed already fine (audit found no gap, no action taken):** input validation
+(Zod everywhere), parameterized queries (Prisma ORM only, the one raw-SQL surface is
+already sandboxed — session 10's Database Console), IDOR protection (every `[id]` route
+scopes by session-derived `companyId`, spot-checked across 4 verticals), mass assignment
+(every service builds its Prisma `data:` object field-by-field from validated input, no
+`...body` spreads), indexes on the other 3 newest models (FixedAsset/ProductionOrder/
+JobCard all already match the established pattern), secret exposure (no `console.log` of
+sensitive data anywhere, `.env.example` has only placeholder values).
+
+tsc + eslint + build + 38/38 existing tests green (no test-worthy pure-function logic
+changed — the N+1 fix only changed query *shape*, not calculation results, which the
+existing Sales test suite plus a live curl regression already covers). Verified live via
+curl: CSRF enforcement (4 scenarios), refresh rate limiting (429 after 20/min), refactored
+Settings routes still return correct data, multi-line invoice COGS + trial balance still
+correct after the N+1 fix.
+
+**Gaps knowingly left for a future pass** (per the audit, all assessed as low-priority):
+no rate limit on `/api/system/query` (already RBAC-gated to Administrator only, so
+exploitability is insider-only); no rate limit on general CRUD endpoints (same reasoning
+— authenticated + RBAC'd, risk is insider-DoS at worst); no response caching anywhere
+(no evidence of a performance problem yet, premature to add); no monitoring/APM hooks
+(would need an external service, out of scope for this environment).
+
 ### Session 15 — 2026-09-11 (Branding + theming/accessibility + status pages)
 Cross-cutting UI/UX pass, client-requested directly (not a v1 accounting module):
 real company branding (Bela Nepal Industries' own navy/orange logo, replacing the

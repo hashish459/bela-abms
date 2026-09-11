@@ -3,7 +3,7 @@ import { randomUUID, createHash } from "crypto";
 import { db } from "./db";
 import { env } from "./env";
 import { signAccessToken, signRefreshToken } from "./jwt";
-import { accessCookie, refreshCookie } from "./cookies";
+import { accessCookie, refreshCookie, csrfCookie } from "./cookies";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -36,7 +36,8 @@ export async function issueSession(opts: {
     },
   });
 
-  return { cookies: [accessCookie(access), refreshCookie(refresh)] };
+  const csrfToken = randomUUID();
+  return { cookies: [accessCookie(access), refreshCookie(refresh), csrfCookie(csrfToken)] };
 }
 
 /** Validate a refresh token string against the store. Returns the row or null. */

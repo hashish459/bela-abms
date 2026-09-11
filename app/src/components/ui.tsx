@@ -207,13 +207,26 @@ export function toast(msg: string, kind: "ok" | "err" = "ok") {
 }
 
 /** Small typed fetch wrapper for the API envelope. */
+/** Reads the readable (non-httpOnly) double-submit CSRF cookie set at login. */
+function csrfToken(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  return document.cookie
+    .split("; ")
+    .find((c) => c.startsWith("abms_csrf="))
+    ?.split("=")[1];
+}
+
 export async function api<T>(
   url: string,
   init?: RequestInit,
 ): Promise<{ ok: true; data: T } | { ok: false; error: { code: string; message: string } }> {
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(csrfToken() ? { "x-csrf-token": csrfToken()! } : {}),
+      ...init?.headers,
+    },
   });
   return res.json();
 }

@@ -1151,7 +1151,7 @@ model BillOfMaterial {
   productionOrders ProductionOrder[]
 
   @@unique([companyId, outputProductId, name])
-  @@index([companyId])
+  @@index([companyId, isActive])
 }
 
 model BomComponent {
