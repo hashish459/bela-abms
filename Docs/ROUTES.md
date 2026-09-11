@@ -9,7 +9,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 |-------|------|------|-------|
 | `/` | – | redirect | → `/dashboard` if session, else `/login` |
 | `/login` | – | `(auth)/login` | email+password; `?next=` return path |
-| `/dashboard` | A | `(app)/dashboard` | accessible-module overview (no fake KPIs yet) |
+| `/dashboard` | A | `(app)/dashboard` | real KPIs (Sales/Purchase/Profit/Cash/Aging/Low-stock), permission-scoped, sales trend chart, recent activity |
 | `/dashboard/settings/company-info` | A · `settings.company_info` | Company Info | legal identity + IRD/CBMS fields (stubbed) |
 | `/dashboard/settings/fiscal-year` | A · `settings.fiscal_year` | Fiscal Year | BS label + AD dates, active flag |
 | `/dashboard/settings/tax` | A · `settings.tax` | Tax | rate list; system rows locked |

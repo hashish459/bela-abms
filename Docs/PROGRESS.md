@@ -13,6 +13,45 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 11 — 2026-09-11 (Module 7 — Dashboard KPIs)
+- **`src/server/dashboard/service.ts`** (new): `salesSummary`/`purchaseSummary` (net of
+  Credit/Debit Notes, FY-to-date), `cashAndBankBalance` (Σ Dr−Cr across every ledger under the
+  `CCE` account head), `salesTrend` (zero-filled daily net sales, trailing N days),
+  `lowStockAlerts` (GOODS products at/below `reorderPoint`). All pure read functions reused
+  alongside the existing `profitAndLoss`/`receivablesAging`/`payablesAging`
+  (`src/server/reports/service.ts`) and `listSalesDocs`/`listPurchaseDocs` — no duplicated
+  business logic, the dashboard is just a different lens on the same data.
+- **`dashboard/page.tsx`** rewritten from the old "accessible-module overview" placeholder to
+  real, **permission-scoped** KPI cards (Net Sales, Net Purchases, Net Profit, Cash & Bank,
+  Receivables/Payables Outstanding, Low Stock Alerts, Audit Log count), a 30-day sales trend
+  bar chart (`src/components/bar-chart.tsx`, dependency-free inline SVG — no chart library
+  added), and Recent Sales/Purchase Invoices + Top Outstanding Receivables + Low Stock lists.
+  Every section is individually gated behind the same permission keys the underlying report
+  API enforces (`sales.sales_invoice`, `purchase.purchase_invoice`, `reports.accounting_reports`,
+  `reports.receivable_reports`, `reports.payable_reports`, `inventory.product_item`) — a
+  Cashier's dashboard genuinely only renders Sales + Low Stock + Audit count, not just visually
+  hidden cards computed anyway.
+- **Bug found and fixed during browser verification:** a hydration-mismatch crash on first
+  load, traced via `preview_logs` to `src/components/bar-chart.tsx`'s `<title>` tooltip —
+  `<title>{p.date}: Rs. {p.amount.toLocaleString()}</title>` has multiple JSX children
+  (text + expression + text + expression), which React explicitly does not support inside
+  `<title>` (must be a single string). Fixed with a template literal:
+  `` <title>{`${p.date}: Rs. ${p.amount.toLocaleString("en-US")}`}</title> `` — also pinned
+  the locale explicitly (`"en-US"`) on this and two other `toLocaleString()` calls added this
+  session, since an unpinned locale is a second, independent way to get server/client output
+  drift. Confirmed fixed by checking the Next.js dev-overlay's shadow DOM for an active error
+  badge after a full server restart (Turbopack HMR had gotten stuck serving stale code for the
+  first fix attempt — a plain `preview_stop`/`preview_start` cycle resolved that separately).
+- **Verified in browser** as both Administrator (all 7 KPI cards + chart + 3 recent-activity
+  panels) and Cashier (Net Sales + Low Stock + Audit Log only, everything else correctly
+  absent — not hidden via CSS, never fetched). tsc + eslint + build + 18/18 tests green.
+- **Note on the demo data:** Cash & Bank Balance shows a large negative figure (-100,838.20).
+  This is mathematically correct given what's in the ledger — the demo dataset (session 10)
+  never posted an opening "owner's capital" entry into Cash/Bank, so several real cash
+  payments (supplier payment, cash purchase, rent) have no funding entry behind them. Not a
+  dashboard bug; a follow-up could add a capital-injection opening entry to `seed-demo.ts` for
+  a more realistic-looking cash position.
+
 ### Session 10 — 2026-09-11 (Demo data + User Manuals + System diagnostics)
 Not a v1 accounting module — three cross-cutting additions the client asked for directly.
 
@@ -333,7 +372,8 @@ Recommended order & why:
   7. **Reports:** ✅ Trial Balance · ✅ Ledger · ✅ P&L · ✅ Balance Sheet · ✅ Day Book ·
      ✅ Stock Summary · ✅ VAT Return · ✅ Receivable/Payable Aging — *done session 9*.
      ⬜ Annex 5/13 exact IRD formats (needs the CBMS pass) · ⬜ PDF/Excel export.
-  8. **Dashboard** widgets (now real numbers exist — Sales/Purchase/GL/Aging all live).
+  8. **Dashboard** widgets — ✅ done session 11 (KPIs, sales trend chart, recent activity,
+     fully permission-scoped).
   9. **Documents**, then **verticals** (Fixed Assets → Manufacturing → Workshop → Restaurant →
      Fuel/Token → Printing). *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls

@@ -110,7 +110,7 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | RBAC permission matrix | ✓ | ✅ (model + seed; **UI editor pending**) |
 | Data-driven menu + submenus | ✓ | ✅ (`/api/menu`, permission-filtered) |
 | App shell (sidebar/header/FY/bell/profile) | ✓ | ✅ (bell/search not wired to data) |
-| Dashboard widgets/KPIs | ✓ | ⬜ (needs transaction modules) |
+| Dashboard widgets/KPIs | ✓ | ✅ Sales/Purchase/Profit/Cash/Aging/Low-stock, permission-scoped, sales trend chart |
 | Company / Branch / Fiscal year | ✓ | ✅ Company Info + Fiscal Year (BS/AD) + Tax pages; ⬜ switcher UI |
 | Chart of Accounts (3-level NFRS) | ✓ | ✅ seed (36/106/181) + browser + Add Account |
 | Contacts (customer/supplier) | ✓ | ✅ Customers/Suppliers + form (opening → GL) |

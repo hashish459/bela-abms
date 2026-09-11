@@ -97,7 +97,7 @@ export default async function SystemInfoPage() {
             {info.modules.map((m) => (
               <tr key={m.name} className="hover:bg-accent-tint">
                 <td className="px-4 py-2">{m.name}</td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium">{m.count.toLocaleString()}</td>
+                <td className="px-4 py-2 text-right tabular-nums font-medium">{m.count.toLocaleString("en-US")}</td>
               </tr>
             ))}
           </tbody>
