@@ -128,6 +128,8 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Quotation → Sales Order → Invoice | ✓ | ✅ drafts + convert |
 | Receipt / Credit Note | ✓ | ✅ receipt updates invoice status; credit note reverses GL+stock+COGS |
 | Perpetual inventory / COGS | (implied) | ✅ weighted-average cost on every sale |
+| Purchase Order → Purchase Invoice (immutable + GL + stock at landed cost) | ✓ | ✅ `PU-2083/84-0001`; excise/custom duty capitalized into Inventory; 405 on edit/delete |
+| Supplier Payment / Debit Note | ✓ | ✅ payment updates invoice status; debit note reverses GL+stock at its own valuation |
 | Responsive UI | ✓ | ✅ shell + modules |
 | Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |
 

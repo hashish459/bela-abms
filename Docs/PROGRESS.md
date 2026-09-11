@@ -13,6 +13,45 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 8 — 2026-09-11 (Module 5 — Purchase)
+- Schema: `PurchaseDoc` (PURCHASE_ORDER/INVOICE/DEBIT_NOTE) + `PurchaseDocItem` + `SupplierPayment`.
+  Mirrors `SalesDoc`, roles reversed (we're the buyer). Migration `purchase`.
+- **`src/server/purchase/calc.ts`** — totals engine, **8 Vitest tests**. Key difference from
+  Sales: excise + custom duty are **capitalized into landed cost** (added to the taxable base
+  before VAT), not expensed — standard perpetual-inventory treatment. Exposes both
+  `landedAmount` (pre-discount, display) and **`capitalizedAmount`** (post-discount — the
+  value that must drive every GL/stock posting).
+- **`src/server/purchase/service.ts`**:
+  - `createPurchaseInvoice` — one tx: stock IN (goods, valued at landed unit cost incl. duty)
+    → `postVoucher(PURCHASE)` Dr Inventory (goods) + Dr Purchase Expense (non-goods) +
+    Dr Input VAT Receivable / Cr Supplier → paid-immediately also books a Supplier Payment.
+    Gap-free `PU-2083/84-0001`. **Immutable** — no update/delete route (405).
+  - `createSupplierPayment` — Dr Supplier / Cr Cash-Bank; updates invoice status; rejects
+    over-payment.
+  - `createDebitNote` — purchase return: stock OUT + reverse GL, capped at invoice remainder.
+  - `createPurchaseOrder` / `convertPurchaseOrder` — draft, no GL/stock, converts to invoice.
+- **Two real bugs found and fixed by `postVoucher`'s Σdebit=Σcredit guard** (transaction
+  rolled back cleanly both times, no data corruption):
+  1. Service layer summed the item's **pre-discount** `landedAmount` to build the Inventory
+     debit instead of the post-discount `capitalizedAmount` → voucher out of balance by
+     exactly the header-discount amount. Fixed by adding `capitalizedAmount` to the calc
+     result and using it everywhere GL/stock amounts are built. Added a regression test.
+  2. `createDebitNote` valued the returned stock at the product's **current weighted-average
+     cost** (which drifts with unrelated purchases) instead of the debit note's own
+     `landedUnitCost` — same class of imbalance. A debit note must reverse exactly what its
+     own lines say (mirrors the original invoice, Dr/Cr swapped), not a re-derived average.
+- API: `/api/purchase/{calc,orders,invoices[/id],payments,debit-notes,docs/[id]/convert}`.
+  UI: Purchase section (TabNav: Purchase Order/Invoice/Payments/Debit Notes) with
+  `PurchaseLineEditor` (adds Excise/Custom columns to the Sales line-grid pattern).
+- **Verified (curl):** credit purchase (100 @ 100, excise 200, custom 300, discount 500) →
+  Dr Inventory 10000 / Dr VAT Receivable 1300 / Cr Supplier 11300, trial balance ties; second
+  purchase blends weighted-avg cost correctly (100@100 + 50@140 → avg 113.33); cash purchase
+  auto-pays; supplier payment reduces outstanding + flips status; debit note (return 10 units)
+  reverses GL/stock correctly and invoice → RETURNED; over-limit debit note rejected;
+  PATCH/DELETE → 405. tsc + eslint + build + **18/18 tests** (10 sales + 8 purchase) green.
+- **Gaps:** Goods Received / Imports / Expenses sub-pages stubbed; purchase detail/print view;
+  DB-integration tests for the posting flow (verified manually via curl, same as Sales).
+
 ### Session 1 — 2026-09-10
 - Read brief. Locked stack: **Next.js + Prisma + PostgreSQL**, session auth, Tailwind.
 - Built `Docs/` living-doc set + Next.js scaffold. Hit `&`-in-path blocker → folder rename.
@@ -196,8 +235,9 @@ Recommended order & why:
   4. **Sales:** ✅ Quotation → Sales Order → **Sales Invoice** (calc engine + `postVoucher` +
      `postStockMovement` + perpetual COGS + numbering + immutable) → ✅ Receipt → ✅ Credit Note
      — *done session 7*. ⬜ invoice detail/print · ⬜ Chalani/Cheque/Proforma.
-  5. **Purchase:** Purchase Order → Purchase Invoice (excise/custom duty, input VAT) →
-     Payment → Debit Note → Goods Received / Import.
+  5. **Purchase:** ✅ Purchase Order → Purchase Invoice (excise/custom duty capitalized into
+     landed cost, input VAT, immutable) → ✅ Payment → ✅ Debit Note — *done session 8*.
+     ⬜ Goods Received / Imports / Expenses.
   6. **Vouchers UI:** Journal / Contra / Stock Journal (thin UI over `postVoucher`).
   7. **Reports:** Trial Balance → Ledger → P&L → Balance Sheet → Day Book → Stock Summary →
      VAT Return / Annexes → Aging. (All read GL / StockMovement.)

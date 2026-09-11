@@ -120,10 +120,20 @@ Trial Balance / Ledger Statement compute **purely from `VoucherLine`** aggregati
 `src/server/sales/service.ts` — every invoice/receipt/credit-note posts balanced GL via
 `postVoucher` + stock via `postStockMovement` + perpetual COGS at weighted-average cost.
 
-### Purchase
-`purchase order` (PO) · `invoice` (`invoice_type=PU`) + items (excise/custom duty) ·
-`goods received` (GRN) · `import invoice` (with LC/customs) · `expense` · Debit Note
-(purchase return) · Supplier Payment.
+### Purchase — ✅ BUILT (session 8)
+| Reference | Clone | Notes |
+|---|---|---|
+| `purchase order` + `invoice` (`invoice_type=PU`) | **`PurchaseDoc` + `PurchaseDocItem`** ✅ | one model, `type` = PURCHASE_ORDER/INVOICE/DEBIT_NOTE. `number, date, supplierLedgerId, supplierInvoiceNumber, paymentMode, paymentLedgerId?, convertedFromId, reversesDocId, status, voucherId` + server totals incl. `totalExciseDuty, totalCustomDuty`. **Immutable once created.** |
+| — | **`PurchaseDocItem`** ✅ | snapshot incl. `exciseDuty, customDuty, landedAmount` (pre-discount, display), `landedUnitCost` (post-discount — feeds `StockMovement.unitCost`) |
+| Supplier Payment | **`SupplierPayment`** ✅ | mirrors `Receipt`: `number, date, supplierLedgerId, paymentLedgerId, againstDocId?, amount, voucherId` |
+| Debit Note | **`PurchaseDoc` type DEBIT_NOTE** ✅ | `reversesDocId` → the invoice; valued at ITS OWN landed cost, not a re-derived weighted average (Docs/WORKFLOWS.md W5) |
+| `goods received` (GRN) / `import invoice` (LC/customs) / `expense` | (planned) | Purchase sub-docs |
+
+**Costing rule:** excise + custom duty are **capitalized into landed cost** (added to what
+Inventory is Dr'd for), not expensed — `src/server/purchase/calc.ts` (8 unit tests). Non-goods
+lines (Service/Expense products, or no product) instead Dr the "Purchase" expense ledger
+(`COS-01-0001`). VAT here is **Input VAT** (`Vat Receivable`, `ONFA-C-06-0001`), the mirror of
+Sales' VAT Payable.
 
 ### Fixed Assets  ⚠️ present in backend, minimal in nav
 `asset` · `asset life` (depreciation schedule) · `asset expense` · `capitalization` ·

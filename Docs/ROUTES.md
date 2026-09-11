@@ -30,6 +30,10 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
 | `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
 | `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
+| `/dashboard/purchase/purchase-order` | A · `purchase.purchase_order` | Purchase Order | list + form + convert |
+| `/dashboard/purchase/purchase-bills` | A · `purchase.purchase_invoice` | Purchase Invoice | list + form (excise/custom duty columns, immutability notice) |
+| `/dashboard/purchase/supplier-payment` | A · `purchase.payment` | Payments | list + payment form (against invoice) |
+| `/dashboard/purchase/debit-note` | A · `purchase.debit_notes` | Debit Notes | list + return form (pick invoice) |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
@@ -74,17 +78,19 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/sales/docs/[id]/convert` | A · `sales.sales_invoice` create | quotation→order→invoice prefill |
 | GET/POST | `/api/sales/receipts` | A · `sales.receipt` | list / create (Dr cash / Cr customer; updates invoice status) |
 | GET/POST | `/api/sales/credit-notes` | A · `sales.credit_note` | list / create (stock IN + reverse GL + reverse COGS; capped at invoice value) |
+| POST | `/api/purchase/calc` | A · `purchase.purchase_invoice` read | preview totals (excise/custom duty capitalized) |
+| GET/POST | `/api/purchase/orders` | A · `purchase.purchase_order` | list / create (no GL/stock) |
+| GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **immutable, no PATCH/DELETE**) |
+| GET | `/api/purchase/invoices/[id]` | A · `purchase.purchase_invoice` read | invoice detail with items + payments |
+| POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
+| GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
+| GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 
 ```
 /api/companies            /api/branches           /api/fiscal-years
 /api/users  /api/roles  /api/permissions          /api/settings/*  (tax, custom-fields, banks, …)
-/api/accounts (chart-of-accounts, grouping-heads)  /api/contacts    /api/cash-bank
-/api/inventory/categories  /api/inventory/units  /api/inventory/warehouses
-/api/inventory/products    /api/inventory/adjustments  /api/inventory/transfers  /api/inventory/stock
-/api/sales/quotations  /api/sales/orders  /api/sales/invoices  /api/sales/receipts  /api/sales/credit-notes
-/api/purchase/orders   /api/purchase/invoices  /api/purchase/payments  /api/purchase/debit-notes
 /api/vouchers          /api/ledger
 /api/budget/headings /api/budget/budgets /api/budget/allocations /api/budget/funds
 /api/tokens            /api/crm/*              /api/documents/*        /api/store/*

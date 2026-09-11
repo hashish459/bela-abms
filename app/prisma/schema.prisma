@@ -45,6 +45,8 @@ model Company {
   inventoryAdjustments InventoryAdjustment[]
   salesDocs            SalesDoc[]
   receipts             Receipt[]
+  purchaseDocs         PurchaseDoc[]
+  supplierPayments     SupplierPayment[]
 }
 
 model Branch {
@@ -75,10 +77,12 @@ model FiscalYear {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vouchers  Voucher[]
-  salesDocs SalesDoc[]
-  receipts  Receipt[]
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vouchers         Voucher[]
+  salesDocs        SalesDoc[]
+  receipts         Receipt[]
+  purchaseDocs     PurchaseDoc[]
+  supplierPayments SupplierPayment[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -845,6 +849,139 @@ model Receipt {
   @@unique([companyId, number])
   @@index([companyId, date])
   @@index([customerLedgerId])
+}
+
+/// ──────────────────────────────  PURCHASE  ───────────────────────────
+/// Mirrors Sales, roles reversed (we are the buyer). Excise/custom duty are
+/// CAPITALIZED into landed cost (added to Inventory), not expensed — standard
+/// perpetual-inventory treatment. VAT here is Input VAT (Vat Receivable), the
+/// mirror image of Sales' VAT Payable. Purchase Invoice is IMMUTABLE; corrections
+/// go through a Debit Note (Docs/WORKFLOWS.md W5).
+
+enum PurchaseDocType {
+  PURCHASE_ORDER
+  INVOICE
+  DEBIT_NOTE
+}
+
+enum PurchaseDocStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CONVERTED
+  CANCELLED
+  RETURNED
+}
+
+model PurchaseDoc {
+  id           String          @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  type         PurchaseDocType
+  number       String // "PU-2083/84-0001", "PO-…", "DN-…"
+  date         DateTime        @db.Date
+
+  supplierLedgerId      String?
+  supplierName          String? // display snapshot
+  supplierPan           String?
+  supplierInvoiceNumber String? // required for INVOICE — the vendor's own bill number
+
+  deliveryDate    DateTime?   @db.Date
+  referenceNo     String?
+  paymentMode     PaymentMode @default(CREDIT)
+  paymentLedgerId String?
+  notes           String?
+
+  convertedFromId String? // purchase order → invoice chain
+  reversesDocId   String? // debit note → the invoice it debits
+
+  subtotal          Decimal @default(0) @db.Decimal(18, 2)
+  lineDiscountTotal Decimal @default(0) @db.Decimal(18, 2)
+  invoiceDiscount   Decimal @default(0) @db.Decimal(18, 2)
+  totalExciseDuty   Decimal @default(0) @db.Decimal(18, 2)
+  totalCustomDuty   Decimal @default(0) @db.Decimal(18, 2)
+  nonTaxableTotal   Decimal @default(0) @db.Decimal(18, 2)
+  taxableTotal      Decimal @default(0) @db.Decimal(18, 2)
+  vatAmount         Decimal @default(0) @db.Decimal(18, 2)
+  grandTotal        Decimal @default(0) @db.Decimal(18, 2)
+  amountPaid        Decimal @default(0) @db.Decimal(18, 2)
+
+  status      PurchaseDocStatus @default(DRAFT)
+  voucherId   String?           @unique
+  createdById String?
+  createdAt   DateTime          @default(now())
+
+  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  items      PurchaseDocItem[]
+  payments   SupplierPayment[]
+
+  @@unique([companyId, number])
+  @@index([companyId, type, date])
+  @@index([supplierLedgerId])
+  @@index([convertedFromId])
+  @@index([reversesDocId])
+}
+
+model PurchaseDocItem {
+  id          String  @id @default(cuid())
+  docId       String
+  productId   String?
+  description String
+  hsCode      String?
+  batchId     String?
+  warehouseId String?
+
+  qty        Decimal @db.Decimal(18, 3)
+  rate       Decimal @db.Decimal(18, 4)
+  discount   Decimal @default(0) @db.Decimal(18, 2)
+  exciseDuty Decimal @default(0) @db.Decimal(18, 2)
+  customDuty Decimal @default(0) @db.Decimal(18, 2)
+
+  taxRateId    String?
+  taxRatePct   Decimal @default(0) @db.Decimal(7, 4)
+  isNonTaxable Boolean @default(false)
+
+  grossAmount    Decimal @db.Decimal(18, 2) // qty × rate
+  netAmount      Decimal @db.Decimal(18, 2) // gross − line discount
+  landedAmount   Decimal @db.Decimal(18, 2) // net + exciseDuty + customDuty — the taxable/capitalized base
+  landedUnitCost Decimal @db.Decimal(18, 4) // landedAmount ÷ qty — feeds StockMovement.unitCost
+  lineVat        Decimal @default(0) @db.Decimal(18, 2)
+  order          Int     @default(0)
+
+  doc PurchaseDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@index([productId])
+}
+
+model SupplierPayment {
+  id           String   @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  number       String // "PM-2083/84-0001"
+  date         DateTime @db.Date
+
+  supplierLedgerId String
+  paymentLedgerId  String
+  againstDocId     String?
+  amount           Decimal     @db.Decimal(18, 2)
+  paymentMode      PaymentMode @default(CASH)
+  reference        String?
+  notes            String?
+
+  voucherId   String?  @unique
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  againstDoc PurchaseDoc? @relation(fields: [againstDocId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+  @@index([supplierLedgerId])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────
