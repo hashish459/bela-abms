@@ -19,6 +19,13 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
 | `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | (uses `voucher-workspace`, page pending) |
 | `/dashboard/reports/accounting/trial-balance` | A · `reports.accounting_reports` | Trial Balance | grouped, print |
+| `/dashboard/reports/accounting/ledger` | A · `reports.accounting_reports` | Ledger Report | `LedgerPicker` + running statement |
+| `/dashboard/reports/accounting/profit-loss` | A · `reports.accounting_reports` | Profit & Loss | date range, grouped by account head |
+| `/dashboard/reports/accounting/balance-sheet` | A · `reports.accounting_reports` | Balance Sheet | as-of date; ties via Current Year Profit line |
+| `/dashboard/reports/accounting/day-book` | A · `reports.accounting_reports` | Day Book | single date, full voucher/line detail |
+| `/dashboard/reports/tax/vat-return` | A · `reports.tax_reports` | VAT Return | output vs input VAT, date range |
+| `/dashboard/reports/receivable/aging` | A · `reports.receivable_reports` | Receivable Aging | 0-30/31-60/61-90/90+ buckets by customer |
+| `/dashboard/reports/payable/aging` | A · `reports.payable_reports` | Payable Aging | 0-30/31-60/61-90/90+ buckets by supplier |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
@@ -85,6 +92,12 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
 | GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
 | GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |
+| GET | `/api/reports/profit-loss` | A · `reports.accounting_reports` read | `?from&to`; income vs expense by account head |
+| GET | `/api/reports/balance-sheet` | A · `reports.accounting_reports` read | `?asOf`; assets vs liabilities+equity+current-year-profit |
+| GET | `/api/reports/day-book` | A · `reports.accounting_reports` read | `?date`; every voucher posted that day |
+| GET | `/api/reports/vat-return` | A · `reports.tax_reports` read | `?from&to`; output/input VAT + taxable sales/purchase net of returns |
+| GET | `/api/reports/aging/receivable` | A · `reports.receivable_reports` read | `?asOf`; outstanding Sales Invoices net of Credit Notes, bucketed |
+| GET | `/api/reports/aging/payable` | A · `reports.payable_reports` read | `?asOf`; outstanding Purchase Invoices net of Debit Notes, bucketed |
 
 ## Planned — API (per module, Phase 5) — grouped by domain
 

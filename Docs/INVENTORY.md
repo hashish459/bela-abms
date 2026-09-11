@@ -116,6 +116,12 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Contacts (customer/supplier) | ✓ | ✅ Customers/Suppliers + form (opening → GL) |
 | General ledger / double-entry | ✓ | ✅ `postVoucher` (ΣDr=ΣCr), Journal + Contra voucher UI |
 | Trial Balance | ✓ | ✅ (grouped, print) — reads GL |
+| Ledger Report | ✓ | ✅ picker + running statement |
+| Profit & Loss | ✓ | ✅ date range, by account head |
+| Balance Sheet | ✓ | ✅ as-of date; ties via Current Year Profit line |
+| Day Book | ✓ | ✅ single date, full voucher detail |
+| VAT Return | ✓ | ✅ output/input VAT, net of Credit/Debit Notes |
+| Receivable / Payable Aging | ✓ | ✅ 0-30/31-60/61-90/90+ buckets |
 | Forms / validation | ✓ | ✅ settings + accounts modules (Zod both sides) |
 | CRUD (domain module) | ✓ | ✅ ledgers, contacts, tax, fiscal years, vouchers |
 | Search / filters / pagination | ✓ | ◑ ledger search + voucher pagination; per-module later |

@@ -13,6 +13,43 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 9 — 2026-09-11 (Module 6 — Reports)
+- **`src/server/reports/service.ts`** (new) — six report functions, all read-only, all sourced
+  directly from `VoucherLine`/`SalesDoc`/`PurchaseDoc` (no new tables, no duplicated totals):
+  - `profitAndLoss(from, to)` — Income (credit-natural) vs Expense (debit-natural), grouped by
+    account head, from ledgers whose `accountHead.accountType` is IN/EX.
+  - `balanceSheet(asOf)` — reuses `trialBalance()`, splits AS vs LI/EQ, adds a "Current Year
+    Profit" line under Equity from `profitAndLoss({ to: asOf })`. **Ties to the paisa** by
+    construction: `postVoucher`'s Σdebit=Σcredit invariant guarantees Assets = Liabilities +
+    Equity + NetProfit for any point in time, no plug entry needed.
+  - `dayBook(date)` — every voucher posted that day, full line detail, running Dr/Cr totals.
+  - `vatReturn(from, to)` — Output VAT (`ONFC-C-07-0001` movement) vs Input VAT
+    (`ONFA-C-06-0001` movement), plus taxable/non-taxable Sales-net-of-CreditNote and
+    Purchase-net-of-DebitNote breakdowns from the doc tables.
+  - `receivablesAging(asOf)` / `payablesAging(asOf)` — 0-30/31-60/61-90/90+ buckets on
+    outstanding Sales/Purchase Invoices. **Important wrinkle found while building this:**
+    `SalesDoc.amountPaid`/`grandTotal` are NOT touched by a Credit Note (only `status`
+    changes) — same for `PurchaseDoc` + Debit Note. So outstanding had to be computed as
+    `grandTotal − amountPaid − Σ(credit/debit notes against this doc)`, not the naive
+    `grandTotal − amountPaid` used elsewhere for display. No existing code changed; this is
+    purely how the new report reads the same data.
+- API: `/api/reports/{profit-loss,balance-sheet,day-book,vat-return,aging/receivable,aging/payable}`.
+- UI: added `dashboard/reports/layout.tsx` (TabNav across all 9 reports — was missing before,
+  each report page had no shared shell). Six new pages + a **Ledger Report page** (the API
+  already existed from session 5 but had no UI — gap closed here) using `LedgerPicker`.
+  New shared `components/aging-view.tsx` parameterized for Receivable vs Payable.
+- **Verified with a full transaction cycle** created via curl on a fresh dev DB (credit sale +
+  cash sale + receipt + credit note + credit purchase w/ excise+custom duty + payment + debit
+  note): Balance Sheet ties (Assets 4181.20 = Liabilities+Equity 4181.20 exactly), VAT Return
+  math hand-verified (output 390.00, input 193.70, payable 196.30), both Aging reports match
+  the ledger statement's closing balance exactly (1260.00 / 783.70), Day Book shows the
+  correct Dr/Cr breakdown for a cash sale. tsc + eslint + build + 18/18 existing tests green.
+  (Hit one ESLint `set-state-in-effect` error pattern across all 6 new client views — same
+  fix as session 7: wrap the fetch + setState calls in a `setTimeout(…, 0)` with cleanup.)
+- **Gaps:** no PDF/Excel export (print-only, same as Trial Balance); VAT Return doesn't yet
+  map to the IRD Annex 5/13 formats (those need the CBMS integration pass); no Vitest for the
+  aging bucket math (verified manually — it's simple date arithmetic, low risk).
+
 ### Session 8 — 2026-09-11 (Module 5 — Purchase)
 - Schema: `PurchaseDoc` (PURCHASE_ORDER/INVOICE/DEBIT_NOTE) + `PurchaseDocItem` + `SupplierPayment`.
   Mirrors `SalesDoc`, roles reversed (we're the buyer). Migration `purchase`.
@@ -238,10 +275,11 @@ Recommended order & why:
   5. **Purchase:** ✅ Purchase Order → Purchase Invoice (excise/custom duty capitalized into
      landed cost, input VAT, immutable) → ✅ Payment → ✅ Debit Note — *done session 8*.
      ⬜ Goods Received / Imports / Expenses.
-  6. **Vouchers UI:** Journal / Contra / Stock Journal (thin UI over `postVoucher`).
-  7. **Reports:** Trial Balance → Ledger → P&L → Balance Sheet → Day Book → Stock Summary →
-     VAT Return / Annexes → Aging. (All read GL / StockMovement.)
-  8. **Dashboard** widgets (now real numbers exist).
+  6. **Vouchers UI:** Journal / Contra ✅ (session 5) · ⬜ Stock Journal (thin UI over `postVoucher`).
+  7. **Reports:** ✅ Trial Balance · ✅ Ledger · ✅ P&L · ✅ Balance Sheet · ✅ Day Book ·
+     ✅ Stock Summary · ✅ VAT Return · ✅ Receivable/Payable Aging — *done session 9*.
+     ⬜ Annex 5/13 exact IRD formats (needs the CBMS pass) · ⬜ PDF/Excel export.
+  8. **Dashboard** widgets (now real numbers exist — Sales/Purchase/GL/Aging all live).
   9. **Documents**, then **verticals** (Fixed Assets → Manufacturing → Workshop → Restaurant →
      Fuel/Token → Printing). *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls
