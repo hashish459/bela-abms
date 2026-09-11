@@ -97,6 +97,16 @@ const PERMISSION_CATALOGUE: Array<{ key: string; name: string; modules: string[]
     name: "Notification & Reminder",
     modules: ["Notification", "Reminder"],
   },
+  {
+    key: "help",
+    name: "Help",
+    modules: ["User Manuals"],
+  },
+  {
+    key: "system",
+    name: "System",
+    modules: ["System Info", "Database Console"],
+  },
 ];
 
 /** Primary + secondary navigation (Docs/DISCOVERY-LOG.md). permissionKey -> PermissionModule.key */
@@ -216,6 +226,25 @@ const MENU: MenuSeed[] = [
       { title: "Custom Status", route: "/dashboard/settings/custom-status", permissionKey: "settings.custom_status" },
       { title: "Backup Data", route: "/dashboard/settings/backup", permissionKey: "settings.backup_data" },
       { title: "Tour", route: "/dashboard/settings/tour", permissionKey: "settings.tour" },
+    ],
+  },
+  {
+    title: "Help", route: "/dashboard/help/getting-started", icon: "book-open",
+    children: [
+      { title: "Getting Started", route: "/dashboard/help/getting-started", permissionKey: "help.user_manuals" },
+      { title: "Accounts & GL", route: "/dashboard/help/accounts-gl", permissionKey: "help.user_manuals" },
+      { title: "Sales", route: "/dashboard/help/sales", permissionKey: "help.user_manuals" },
+      { title: "Purchase", route: "/dashboard/help/purchase", permissionKey: "help.user_manuals" },
+      { title: "Inventory", route: "/dashboard/help/inventory", permissionKey: "help.user_manuals" },
+      { title: "Reports", route: "/dashboard/help/reports", permissionKey: "help.user_manuals" },
+      { title: "Roles & Permissions", route: "/dashboard/help/roles-permissions", permissionKey: "help.user_manuals" },
+    ],
+  },
+  {
+    title: "System", route: "/dashboard/system/info", icon: "activity",
+    children: [
+      { title: "System Info", route: "/dashboard/system/info", permissionKey: "system.system_info" },
+      { title: "Database Console", route: "/dashboard/system/query", permissionKey: "system.database_console" },
     ],
   },
 ];
@@ -360,6 +389,7 @@ async function seedDemoCompany(allPermKeys: string[]) {
     "sales.receipt": { canRead: true, canCreate: true },
     "accounts.contacts": { canRead: true },
     "inventory.product_item": { canRead: true },
+    "help.user_manuals": { canRead: true },
   };
   for (const [key, grant] of Object.entries(cashierGrants)) {
     const mod = await db.permissionModule.findUnique({ where: { key }, select: { id: true } });

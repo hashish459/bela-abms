@@ -26,6 +26,15 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/reports/tax/vat-return` | A · `reports.tax_reports` | VAT Return | output vs input VAT, date range |
 | `/dashboard/reports/receivable/aging` | A · `reports.receivable_reports` | Receivable Aging | 0-30/31-60/61-90/90+ buckets by customer |
 | `/dashboard/reports/payable/aging` | A · `reports.payable_reports` | Payable Aging | 0-30/31-60/61-90/90+ buckets by supplier |
+| `/dashboard/help/getting-started` | A · `help.user_manuals` | Getting Started | orientation, key concepts, first-login checklist |
+| `/dashboard/help/accounts-gl` | A · `help.user_manuals` | Accounts & GL manual | COA hierarchy, double-entry, T-account diagram |
+| `/dashboard/help/sales` | A · `help.user_manuals` | Sales manual | document chain, worked GL example |
+| `/dashboard/help/purchase` | A · `help.user_manuals` | Purchase manual | landed cost worked example |
+| `/dashboard/help/inventory` | A · `help.user_manuals` | Inventory manual | stock movement model, weighted-avg cost |
+| `/dashboard/help/reports` | A · `help.user_manuals` | Reports manual | what each report means, one-sale-five-reports example |
+| `/dashboard/help/roles-permissions` | A · `help.user_manuals` | Roles & Permissions manual | RBAC model explained |
+| `/dashboard/system/info` | A · `system.system_info` | System Info | app/process/host/DB/network diagnostics, module record counts |
+| `/dashboard/system/query` | A · `system.database_console` | Database Console | read-only SQL console (SELECT/WITH only, admin-only) |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
@@ -92,6 +101,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
 | GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
 | GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |
+| GET | `/api/system/info` | A · `system.system_info` read | process/host/DB latency/network + per-module record counts |
+| POST | `/api/system/query` | A · `system.database_console` read | read-only diagnostic SQL (SELECT/WITH only, 200-row cap, audited) |
 | GET | `/api/reports/profit-loss` | A · `reports.accounting_reports` read | `?from&to`; income vs expense by account head |
 | GET | `/api/reports/balance-sheet` | A · `reports.accounting_reports` read | `?asOf`; assets vs liabilities+equity+current-year-profit |
 | GET | `/api/reports/day-book` | A · `reports.accounting_reports` read | `?date`; every voucher posted that day |

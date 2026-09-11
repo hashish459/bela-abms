@@ -13,6 +13,60 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 10 — 2026-09-11 (Demo data + User Manuals + System diagnostics)
+Not a v1 accounting module — three cross-cutting additions the client asked for directly.
+
+- **Comprehensive demo data** (`prisma/seed-demo.ts`, new `npm run db:seed-demo`): scripted
+  against the *running dev server's own API* (not raw Prisma writes) so every record goes
+  through the same validation + GL/stock posting a real user triggers. Creates 3 categories,
+  6 products (incl. one non-taxable, one Service), 2 customers + 2 suppliers with opening
+  balances, then a full Quotation→SalesOrder→Invoice chain, a second credit invoice, a cash
+  sale, a non-taxable export sale, a receipt, a credit note (partial return), a
+  PurchaseOrder→Invoice chain with excise+custom duty, a supplier payment, a debit note, a
+  cash purchase, a manual Journal voucher (rent) + Contra voucher (cash→bank), and an
+  Inventory Adjustment (damage write-off) — spread across dates in FY 2083-84 for realistic
+  Aging buckets. Idempotent (checks by name/SKU before creating). Verified: Trial Balance and
+  Balance Sheet both tie exactly on the resulting dataset; Reports/Dashboard/Aging all show
+  non-trivial numbers out of the box.
+  **Note:** a full `prisma migrate reset` to clear earlier ad-hoc curl test data was blocked
+  by the auto-mode safety classifier (destructive DB op) — left in place rather than working
+  around it, so a few session-8/9 test records ("Reports Test Customer" etc.) coexist
+  alongside the new curated dataset. Cosmetic only, not a functional issue.
+- **User Manuals** (`dashboard/help/*`, permission group `help`, module `help.user_manuals`,
+  granted to every role including Cashier): seven topic pages — Getting Started, Accounts &
+  GL, Sales, Purchase, Inventory, Reports, Roles & Permissions. Shared components in
+  `src/components/manual.tsx`: `FlowSteps` (CSS box-and-arrow workflow diagram),
+  `TAccountDiagram` (inline SVG Dr/Cr T-account), `ExampleBox`/`TipBox`/`WarnBox`/
+  `KeyConcepts`. Each page has a worked numeric example tying back to the real calc engines
+  (e.g. the Sales page's example matches `calcSalesTotals`'s actual VAT math). New "Help" nav
+  item (`book-open` icon) between Settings and System.
+- **System diagnostics** (`dashboard/system/*`, permission group `system`, modules
+  `system.system_info` + `system.database_console` — **Administrator only**, deliberately not
+  granted to Cashier):
+  - **System Info** (`src/server/system/service.ts` → `getSystemInfo()`): app/Next/React/
+    Prisma versions, process memory + uptime, host CPU/memory/network interfaces, DB
+    round-trip latency (3-ping avg), DB size + Postgres version, and a per-module record-count
+    table (Users, Products, Vouchers, Sales/Purchase Docs, Audit Log, …).
+  - **Database Console** (`runDiagnosticQuery()` + `/api/system/query`): a genuinely
+    read-only SQL tool, not a raw `$queryRawUnsafe` passthrough. Defense in depth: (1) must
+    start with SELECT/WITH, no semicolons — blocks stacked statements; (2) keyword blocklist
+    (insert/update/delete/drop/alter/truncate/grant/execute/…) as whole words; (3) **the real
+    backstop** — the query is wrapped as `SELECT * FROM (<query>) AS _diag LIMIT 200`, and
+    Postgres simply cannot parse a non-SELECT statement inside a FROM-subquery, so anything
+    that slipped past 1-2 still fails; (4) runs inside a transaction with
+    `SET TRANSACTION READ ONLY` + a 3s `statement_timeout`; (5) every query is written to
+    `AuditLog`. Verified via curl: `DROP TABLE`, a stacked `SELECT 1; DROP TABLE`, and an
+    `UPDATE` are all rejected before reaching Postgres; a real `SELECT count(*)` succeeds.
+    UI ships 5 canned example queries so non-technical admins aren't stuck facing a blank
+    textarea. RBAC verified both ways: Cashier's `/api/menu` omits "System" entirely, and a
+    direct `curl` to `/api/system/info` as Cashier still gets a real 403 — the menu hide is a
+    convenience, not the security boundary.
+- Seed changes: added `help`/`system` permission groups + `MenuItem` entries to
+  `prisma/seed.ts` (idempotent upserts — safe to re-run); 76 → 79 permission modules.
+- tsc + eslint + build + 18/18 existing tests green; all new pages manually verified in the
+  browser (flow diagrams, T-account SVG, System Info live data, Database Console guard
+  rejections, Cashier RBAC on both the new sections).
+
 ### Session 9 — 2026-09-11 (Module 6 — Reports)
 - **`src/server/reports/service.ts`** (new) — six report functions, all read-only, all sourced
   directly from `VoucherLine`/`SalesDoc`/`PurchaseDoc` (no new tables, no duplicated totals):

@@ -24,6 +24,8 @@ import {
   BarChart3,
   Store,
   Settings,
+  BookOpen,
+  Activity,
   Dot,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -66,6 +68,10 @@ function navIcon(name: string | null, size = 16): ReactNode {
       return <Store size={size} />;
     case "settings":
       return <Settings size={size} />;
+    case "book-open":
+      return <BookOpen size={size} />;
+    case "activity":
+      return <Activity size={size} />;
     default:
       return <Dot size={size} />;
   }
