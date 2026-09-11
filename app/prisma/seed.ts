@@ -64,6 +64,11 @@ const PERMISSION_CATALOGUE: Array<{ key: string; name: string; modules: string[]
     modules: ["Asset Register", "Depreciation"],
   },
   {
+    key: "manufacturing",
+    name: "Manufacturing",
+    modules: ["Bill of Materials", "Production Order"],
+  },
+  {
     key: "accounts",
     name: "Accounts",
     modules: ["Charts of Accounts", "Cash & Bank Account", "Contacts", "Balance Confirmation"],
@@ -188,6 +193,13 @@ const MENU: MenuSeed[] = [
     children: [
       { title: "Asset Register", route: "/dashboard/fixed-assets/register", permissionKey: "fixed_assets.asset_register" },
       { title: "Depreciation", route: "/dashboard/fixed-assets/depreciation", permissionKey: "fixed_assets.depreciation" },
+    ],
+  },
+  {
+    title: "Manufacturing", route: "/dashboard/manufacturing/bom", icon: "factory",
+    children: [
+      { title: "Bill of Materials", route: "/dashboard/manufacturing/bom", permissionKey: "manufacturing.bill_of_materials" },
+      { title: "Production Order", route: "/dashboard/manufacturing/production-order", permissionKey: "manufacturing.production_order" },
     ],
   },
   {

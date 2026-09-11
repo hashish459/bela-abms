@@ -49,6 +49,8 @@ model Company {
   supplierPayments     SupplierPayment[]
   fixedAssets          FixedAsset[]
   depreciationRuns     DepreciationRun[]
+  billOfMaterials      BillOfMaterial[]
+  productionOrders     ProductionOrder[]
 }
 
 model Branch {
@@ -87,6 +89,7 @@ model FiscalYear {
   supplierPayments SupplierPayment[]
   fixedAssets      FixedAsset[]
   depreciationRuns DepreciationRun[]
+  productionOrders ProductionOrder[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -431,6 +434,7 @@ enum VoucherType {
   ASSET
   DEPRECIATION
   ASSET_DISPOSAL
+  MANUFACTURE
 }
 
 /// Every financial document posts one balanced Voucher via postVoucher(). Reports read
@@ -499,6 +503,16 @@ enum ProductKind {
 enum ProductTaxBasis {
   INCLUSIVE
   EXCLUSIVE
+}
+
+/// Which balance-sheet inventory ledger a GOODS product's stock value sits in.
+/// Purchases of RAW_MATERIAL land in "Raw Material Inventory" (INV-02) instead of
+/// "Finished Inventory" (INV-01) — see src/server/purchase/service.ts and
+/// src/server/manufacturing/ledgers.ts. Defaults to FINISHED_GOODS so every product
+/// created before this field existed keeps posting exactly where it always has.
+enum InventoryRole {
+  FINISHED_GOODS
+  RAW_MATERIAL
 }
 
 model ProductCategory {
@@ -586,9 +600,10 @@ model Product {
   purchasePrice Decimal @default(0) @db.Decimal(18, 2)
   sellingPrice  Decimal @default(0) @db.Decimal(18, 2)
 
-  taxRateId    String?
-  taxBasis     ProductTaxBasis @default(EXCLUSIVE)
-  isNonTaxable Boolean         @default(false)
+  taxRateId     String?
+  taxBasis      ProductTaxBasis @default(EXCLUSIVE)
+  isNonTaxable  Boolean         @default(false)
+  inventoryRole InventoryRole   @default(FINISHED_GOODS)
 
   // Optional attributes (reference product form)
   size             String?
@@ -1104,6 +1119,93 @@ model DepreciationRun {
   entries    AssetDepreciationEntry[]
 
   @@index([companyId, fiscalYearId])
+}
+
+/// ──────────────────────────  MANUFACTURING  ────────────────────────────
+/// BOM = "how much of each RAW_MATERIAL Product to consume, per batch, to produce
+/// outputQty of a FINISHED_GOODS Product." A ProductionOrder runs a BOM some number of
+/// `batches`, consuming components at their weighted-average cost (src/server/inventory/
+/// cost.ts, reused as-is) and capitalizing materials + a labor allowance through the real
+/// NFRS WIP Inventory ledger (INV-03) into Finished Inventory (INV-01) — see
+/// src/server/manufacturing/ledgers.ts for the exact ledger codes, all scraped from the
+/// reference COA, not invented.
+model BillOfMaterial {
+  id                String    @id @default(cuid())
+  companyId         String
+  outputProductId   String // a FINISHED_GOODS Product
+  name              String
+  outputQty         Decimal   @default(1) @db.Decimal(18, 3) // units of output per batch
+  laborCostPerBatch Decimal   @default(0) @db.Decimal(18, 2)
+  isActive          Boolean   @default(true)
+  notes             String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+  deletedAt         DateTime?
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  components       BomComponent[]
+  productionOrders ProductionOrder[]
+
+  @@unique([companyId, outputProductId, name])
+  @@index([companyId])
+}
+
+model BomComponent {
+  id                 String  @id @default(cuid())
+  bomId              String
+  componentProductId String // typically a RAW_MATERIAL Product
+  qtyPerBatch        Decimal @db.Decimal(18, 3)
+  order              Int     @default(0)
+
+  bom BillOfMaterial @relation(fields: [bomId], references: [id], onDelete: Cascade)
+
+  @@index([bomId])
+  @@index([componentProductId])
+}
+
+model ProductionOrder {
+  id              String   @id @default(cuid())
+  companyId       String
+  fiscalYearId    String
+  number          String // "MO-2083/84-0001"
+  date            DateTime @db.Date
+  bomId           String
+  outputProductId String
+  warehouseId     String // consumed from and produced into
+  batches         Decimal  @db.Decimal(18, 3)
+  outputQty       Decimal  @db.Decimal(18, 3) // snapshot = bom.outputQty * batches
+  materialCost    Decimal  @db.Decimal(18, 2) // snapshot = Σ component qty × its weighted-avg cost
+  laborCost       Decimal  @db.Decimal(18, 2) // snapshot = bom.laborCostPerBatch * batches
+  totalCost       Decimal  @db.Decimal(18, 2) // materialCost + laborCost
+  unitCost        Decimal  @db.Decimal(18, 4) // totalCost / outputQty -> StockMovement.unitCost
+  notes           String?
+  voucherId       String?  @unique
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  company    Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear            @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  bom        BillOfMaterial        @relation(fields: [bomId], references: [id], onDelete: Restrict)
+  items      ProductionOrderItem[]
+
+  @@unique([companyId, number])
+  @@index([companyId, date])
+}
+
+/// Snapshot of each component actually consumed by one ProductionOrder, at the weighted-
+/// average cost in effect at that moment — same principle as SalesDocItem/PurchaseDocItem.
+model ProductionOrderItem {
+  id                 String  @id @default(cuid())
+  orderId            String
+  componentProductId String
+  qty                Decimal @db.Decimal(18, 3)
+  unitCost           Decimal @db.Decimal(18, 4)
+  amount             Decimal @db.Decimal(18, 2)
+
+  order ProductionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────

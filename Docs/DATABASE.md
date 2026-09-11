@@ -105,7 +105,7 @@ Trial Balance / Ledger Statement compute **purely from `VoucherLine`** aggregati
 | — (derived) | **`StockMovement`** ✅ | `productId, warehouseId, batchId?, date, kind(StockMovementKind), qty (signed Decimal), unitCost, sourceType, sourceId`. **`postStockMovement()` is the single writer; on-hand = Σ qty.** |
 | `product additional field` | `ProductAdditionalField` (planned) | serialised-item fields |
 | `ware house transfer` / `branch inventory transfer` | `WarehouseTransfer` / `BranchInventoryTransfer` (planned) | inter-warehouse / inter-branch |
-| `material bill` / `manufacture demolish` | `MaterialBill` (BOM) / `ManufactureEntry` (planned) | manufacturing verticals |
+| `material bill` / `manufacture demolish` | **`BillOfMaterial`+`BomComponent` / `ProductionOrder`+`ProductionOrderItem`** ✅ session 13 | see "Manufacturing" section below |
 
 ### Sales — ✅ BUILT (session 7)
 | Reference | Clone | Notes |
@@ -163,6 +163,32 @@ value × annual rate% × (months ÷ 12); both capped so book value never drops b
 `monthsBetween()` counts only whole completed calendar months since the asset's last
 depreciation entry (or acquisition, if never run) — an asset under a month past due is
 skipped, never double-charged later.
+
+### Manufacturing — ✅ BUILT (session 13)
+The classic three-bucket costing flow — Raw Material → WIP → Finished Goods — using ledgers
+already present in the scraped NFRS COA (session 5): `INV-01-0001` Finished Inventory (the
+same ledger Sales/Purchase already post to), `INV-02-0001` Raw Material Inventory,
+`INV-03-0001` WIP Inventory, `COS-02-0004` Salary & Wages (direct labor). All in
+`src/server/manufacturing/ledgers.ts`.
+
+| Model | Notes |
+|---|---|
+| **`Product.inventoryRole`** (new enum `InventoryRole`) | `FINISHED_GOODS` (default — every product created before this field existed keeps posting exactly where it always has) or `RAW_MATERIAL`. Purchase Invoice now Dr's `INV-02` instead of `INV-01` for `RAW_MATERIAL` lines only (`src/server/purchase/service.ts` — a small, additive, opt-in change; Debit Note mirrors it) |
+| **`BillOfMaterial` + `BomComponent`** | "produce `outputQty` of a FINISHED_GOODS product per batch, consuming these RAW_MATERIAL quantities" + a flat `laborCostPerBatch` allowance |
+| **`ProductionOrder` + `ProductionOrderItem`** | runs a BOM `batches` times; components are consumed at their **weighted-average cost** (`src/server/inventory/cost.ts`, reused as-is — no new costing logic); snapshots each component's qty/cost, mirroring `SalesDocItem`/`PurchaseDocItem` |
+
+**GL posting** (one voucher, `VoucherType.MANUFACTURE`, prefix `MO-`): Dr WIP Inventory
+(material + labor) → Cr each component's inventory ledger (grouped, role-aware) + Cr Salary &
+Wages (labor) → Dr the output's inventory ledger (material + labor) → Cr WIP Inventory. WIP
+nets to zero within the one voucher but is posted through explicitly (both a debit and credit
+line) rather than netted away, since the reference COA provides a dedicated WIP ledger.
+`StockMovementKind.MANUFACTURE_IN`/`MANUFACTURE_OUT` were already in the schema from Phase 3
+foundation, anticipating this vertical.
+
+**Cost math** (`src/server/manufacturing/calc.ts`, pure, 7 Vitest tests): every component and
+the labor allowance scale linearly by `batches`; unit cost = `(materialCost + laborCost) ÷
+outputQty`. Verified end-to-end via curl against hand-calculated numbers — see PROGRESS.md
+session 13.
 
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·

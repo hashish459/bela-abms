@@ -37,6 +37,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/system/query` | A · `system.database_console` | Database Console | read-only SQL console (SELECT/WITH only, admin-only) |
 | `/dashboard/fixed-assets/register` | A · `fixed_assets.asset_register` | Asset Register | list + add form + detail (depreciation history) + dispose |
 | `/dashboard/fixed-assets/depreciation` | A · `fixed_assets.depreciation` | Depreciation | run history + "Run Depreciation" |
+| `/dashboard/manufacturing/bom` | A · `manufacturing.bill_of_materials` | Bill of Materials | list + add form (output + components + labor) |
+| `/dashboard/manufacturing/production-order` | A · `manufacturing.production_order` | Production Order | list + run form + detail (components consumed) |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
@@ -109,6 +111,10 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/assets/[id]` | A · `fixed_assets.asset_register` read | detail incl. full depreciation-entry history |
 | POST | `/api/assets/[id]/dispose` | A · `fixed_assets.asset_register` update | catch-up depreciation + Dr AccumDep/Proceeds/Loss / Cr Asset+Gain |
 | GET/POST | `/api/assets/depreciation-runs` | A · `fixed_assets.depreciation` | list runs / post a batch run (one voucher, grouped per category) |
+| GET/POST | `/api/manufacturing/boms` | A · `manufacturing.bill_of_materials` | list / create (validates output is FINISHED_GOODS, components are GOODS) |
+| GET | `/api/manufacturing/boms/[id]` | A · `manufacturing.bill_of_materials` read | detail with components |
+| GET/POST | `/api/manufacturing/production-orders` | A · `manufacturing.production_order` | list / run (consumes components at weighted-avg cost, posts Dr WIP→Finished / Cr Raw Material+Labor) |
+| GET | `/api/manufacturing/production-orders/[id]` | A · `manufacturing.production_order` read | detail with components consumed |
 | GET | `/api/reports/profit-loss` | A · `reports.accounting_reports` read | `?from&to`; income vs expense by account head |
 | GET | `/api/reports/balance-sheet` | A · `reports.accounting_reports` read | `?asOf`; assets vs liabilities+equity+current-year-profit |
 | GET | `/api/reports/day-book` | A · `reports.accounting_reports` read | `?date`; every voucher posted that day |

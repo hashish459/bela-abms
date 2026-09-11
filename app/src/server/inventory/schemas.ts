@@ -45,6 +45,7 @@ export const productCreate = z.object({
   taxRateId: z.string().optional().or(z.literal("")),
   taxBasis: z.enum(["INCLUSIVE", "EXCLUSIVE"]).default("EXCLUSIVE"),
   isNonTaxable: z.boolean().default(false),
+  inventoryRole: z.enum(["FINISHED_GOODS", "RAW_MATERIAL"]).default("FINISHED_GOODS"),
 
   size: z.string().max(60).optional().or(z.literal("")),
   color: z.string().max(60).optional().or(z.literal("")),

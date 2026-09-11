@@ -177,6 +177,7 @@ function ProductForm({
     purchasePrice: "", sellingPrice: "",
     taxRateId: taxRates.find((t) => !t.isNoTax)?.id ?? "",
     taxBasis: "EXCLUSIVE", isNonTaxable: false,
+    inventoryRole: "FINISHED_GOODS",
     size: "", color: "", flavour: "",
     openingQty: "", openingWarehouseId: warehouses.find(Boolean)?.id ?? "",
   });
@@ -241,6 +242,14 @@ function ProductForm({
             {kind === "GOODS" && (
               <Field label="Re-order point (in unit)">
                 <Input type="number" step="0.001" value={f.reorderPoint} onChange={set("reorderPoint")} />
+              </Field>
+            )}
+            {kind === "GOODS" && (
+              <Field label="Inventory role" hint="Raw materials feed a Bill of Materials; finished goods are what you sell">
+                <select value={f.inventoryRole} onChange={set("inventoryRole")} className={inputClass}>
+                  <option value="FINISHED_GOODS">Finished Goods</option>
+                  <option value="RAW_MATERIAL">Raw Material</option>
+                </select>
               </Field>
             )}
             <Field label="Description">

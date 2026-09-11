@@ -18,10 +18,18 @@ const orNull = (v?: string) => (v && v.length ? v : null);
 
 /** System ledger codes we post to (seeded NFRS COA). */
 const LEDGER = {
-  INVENTORY: "INV-01-0001", // Finished Inventory — goods lines land here
+  INVENTORY: "INV-01-0001", // Finished Inventory — FINISHED_GOODS lines land here
+  RAW_MATERIAL_INVENTORY: "INV-02-0001", // Raw Material Inventory — RAW_MATERIAL lines land here
   PURCHASE_EXPENSE: "COS-01-0001", // "Purchase" — non-goods / no-product lines
   VAT_RECEIVABLE: "ONFA-C-06-0001", // Vat Receivable (input VAT)
 };
+
+/** FINISHED_GOODS (the default, and every product created before this field existed) keeps
+ * landing on Finished Inventory exactly as before; only an explicitly-flagged RAW_MATERIAL
+ * product routes to the dedicated Raw Material Inventory ledger. */
+function inventoryLedgerCodeFor(role?: string): string {
+  return role === "RAW_MATERIAL" ? LEDGER.RAW_MATERIAL_INVENTORY : LEDGER.INVENTORY;
+}
 
 async function ledgerId(tx: Tx, companyId: string, code: string): Promise<string> {
   const l = await tx.ledger.findFirst({ where: { companyId, code, deletedAt: null }, select: { id: true } });
@@ -51,11 +59,11 @@ async function buildCalcLines(
 
   const productIds = [...new Set(lines.map((l) => orNull(l.productId)).filter(Boolean) as string[])];
   const products = productIds.length
-    ? await tx.product.findMany({ where: { id: { in: productIds }, companyId, deletedAt: null }, select: { id: true, kind: true, isNonTaxable: true } })
+    ? await tx.product.findMany({ where: { id: { in: productIds }, companyId, deletedAt: null }, select: { id: true, kind: true, isNonTaxable: true, inventoryRole: true } })
     : [];
   const productById = new Map(products.map((p) => [p.id, p]));
 
-  return lines.map((l): PurchaseCalcLineInput & { productKind?: string; taxRatePct: number } => {
+  return lines.map((l): PurchaseCalcLineInput & { productKind?: string; inventoryRole?: string; taxRatePct: number } => {
     const rate = orNull(l.taxRateId) ? rateById.get(l.taxRateId!) : undefined;
     const product = orNull(l.productId) ? productById.get(l.productId!) : undefined;
     const nonTaxable = l.isNonTaxable || !!rate?.isNoTax || !!product?.isNonTaxable || !rate;
@@ -67,6 +75,7 @@ async function buildCalcLines(
       customDuty: l.customDuty ?? 0,
       taxRatePct: rate ? Number(rate.ratePct) : 0,
       isNonTaxable: nonTaxable,
+      inventoryRole: product?.inventoryRole,
       productKind: product?.kind,
     };
   });
@@ -236,12 +245,21 @@ export async function createPurchaseInvoice(
     // 2. non-goods lines (service/expense/no-product) are expensed directly
     const expenseLines = doc.items.filter((it, i) => calcLines[i].productKind !== "GOODS");
     const expenseTotal = expenseLines.reduce((a, it) => a.add(it.landedAmount), D(0));
-    const inventoryTotal = goodsLines.reduce((a, it) => a.add(it.landedAmount), D(0));
 
-    // 3. purchase voucher: Dr Inventory + Dr Purchase Expense + Dr Input VAT / Cr Supplier
+    // goods lines split by inventory role — FINISHED_GOODS (the default) keeps landing on
+    // Finished Inventory exactly as before; RAW_MATERIAL lands on Raw Material Inventory.
+    const inventoryByLedger = new Map<string, Prisma.Decimal>();
+    goodsLines.forEach((it) => {
+      const idx = doc.items.indexOf(it);
+      const code = inventoryLedgerCodeFor(calcLines[idx].inventoryRole);
+      inventoryByLedger.set(code, (inventoryByLedger.get(code) ?? D(0)).add(it.landedAmount));
+    });
+
+    // 3. purchase voucher: Dr Inventory (per role) + Dr Purchase Expense + Dr Input VAT / Cr Supplier
     const debitLines: { ledgerId: string; debit: string }[] = [];
-    if (inventoryTotal.gt(0))
-      debitLines.push({ ledgerId: await ledgerId(tx, companyId, LEDGER.INVENTORY), debit: inventoryTotal.toFixed(2) });
+    for (const [code, amount] of inventoryByLedger) {
+      if (amount.gt(0)) debitLines.push({ ledgerId: await ledgerId(tx, companyId, code), debit: amount.toFixed(2) });
+    }
     if (expenseTotal.gt(0))
       debitLines.push({ ledgerId: await ledgerId(tx, companyId, LEDGER.PURCHASE_EXPENSE), debit: expenseTotal.toFixed(2) });
     if (D(totals.vatAmount).gt(0))
@@ -451,12 +469,19 @@ export async function createDebitNote(
       });
     }
 
-    const inventoryBack = goodsLines.reduce((a, it) => a.add(it.landedAmount), D(0));
+    const inventoryBackByLedger = new Map<string, Prisma.Decimal>();
+    goodsLines.forEach((it) => {
+      const idx = dn.items.indexOf(it);
+      const code = inventoryLedgerCodeFor(calcLines[idx].inventoryRole);
+      inventoryBackByLedger.set(code, (inventoryBackByLedger.get(code) ?? D(0)).add(it.landedAmount));
+    });
     const expenseLines = dn.items.filter((it, i) => calcLines[i].productKind !== "GOODS");
     const expenseBack = expenseLines.reduce((a, it) => a.add(it.landedAmount), D(0));
 
     const creditLines: { ledgerId: string; credit: string }[] = [];
-    if (inventoryBack.gt(0)) creditLines.push({ ledgerId: await ledgerId(tx, companyId, LEDGER.INVENTORY), credit: inventoryBack.toFixed(2) });
+    for (const [code, amount] of inventoryBackByLedger) {
+      if (amount.gt(0)) creditLines.push({ ledgerId: await ledgerId(tx, companyId, code), credit: amount.toFixed(2) });
+    }
     if (expenseBack.gt(0)) creditLines.push({ ledgerId: await ledgerId(tx, companyId, LEDGER.PURCHASE_EXPENSE), credit: expenseBack.toFixed(2) });
 
     const v = await postVoucher(tx, {

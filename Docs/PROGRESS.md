@@ -13,6 +13,63 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 13 — 2026-09-11 (Manufacturing vertical)
+Second industry vertical. Same approach as Fixed Assets: the reference app's own nav never
+exposed a manufacturing workflow (Docs/DISCOVERY-LOG.md — "material bill = BOM,
+manufacture-demolish" was all that surfaced from the 76-model list), so this was built from
+the standard Raw Material → WIP → Finished Goods costing flow — but keyed onto **real ledgers
+already sitting in the scraped COA since session 5** (`INV-01/02/03`, `COS-02-0004`), which
+were clearly provisioned for exactly this. `StockMovementKind.MANUFACTURE_IN`/
+`MANUFACTURE_OUT` were also already in the Phase-3 schema, unused until now.
+
+- **`Product.inventoryRole`** (new enum `InventoryRole`: `FINISHED_GOODS` default /
+  `RAW_MATERIAL`) — the one piece of surgery on an already-shipped, already-verified module.
+  `src/server/purchase/service.ts` (`createPurchaseInvoice` + `createDebitNote`) now splits
+  the goods-lines inventory debit/credit by each line's resolved role instead of one hardcoded
+  `INV-01-0001` constant. Every existing product defaults to `FINISHED_GOODS`, so this is
+  additive and changes nothing for any product created before this field existed — verified
+  by re-running the full existing test suite (still 8/8 purchase, 10/10 sales) plus a live
+  curl regression check that an ordinary purchase still posts to Finished Inventory unchanged.
+- Prisma: `BillOfMaterial` + `BomComponent` ("produce `outputQty` of a FINISHED_GOODS product
+  per batch from these RAW_MATERIAL quantities" + a flat `laborCostPerBatch`),
+  `ProductionOrder` + `ProductionOrderItem` (snapshot of what was actually consumed, at the
+  weighted-average cost in effect at that moment — mirrors `SalesDocItem`/`PurchaseDocItem`).
+  New `VoucherType.MANUFACTURE` (prefix `MO-`). 1 migration.
+- **`src/server/manufacturing/calc.ts`** (pure, 7 Vitest tests): `calcProductionCost()` scales
+  every component and the labor allowance by `batches`, derives `unitCost = (materialCost +
+  laborCost) ÷ outputQty` — the value fed to the output's stock movement and GL debit.
+- **`src/server/manufacturing/service.ts`**: `createBom` (validates output is a FINISHED_GOODS
+  GOODS product, components are GOODS, no self-referencing BOM). `createProductionOrder` —
+  looks up each component's **current weighted-average cost** (`src/server/inventory/cost.ts`,
+  reused with zero changes), stock OUT the components / stock IN the output, then posts ONE
+  voucher: Dr WIP (material+labor) → Cr each component's role-resolved inventory ledger + Cr
+  Salary & Wages (labor) → Dr the output's inventory ledger (material+labor) → Cr WIP. WIP
+  nets to zero within the voucher but is posted through explicitly rather than netted away,
+  since the reference COA provides a dedicated ledger for it.
+- API: `/api/manufacturing/{boms[/id],production-orders[/id]}`. New permission group
+  `manufacturing` (`bill_of_materials`, `production_order`) — not granted to Cashier.
+- UI: new "Manufacturing" nav item → Bill of Materials (list + add form: output product,
+  output qty/batch, labor cost/batch, dynamic component rows) + Production Order (list + run
+  form + click-through detail showing every component consumed at its cost). Products page
+  gained an "Inventory Role" selector (Finished Goods / Raw Material) for GOODS products.
+- **Verified end-to-end via curl with hand-calculated numbers**: created Raw Material
+  products (Steel Sheet, Bolt Set) and a Finished Good (Steel Bracket); a purchase of more
+  Steel Sheet correctly landed on Raw Material Inventory (11,000.00) leaving Finished
+  Inventory's balance for every other product untouched; a BOM (1 Steel Sheet + 4 Bolts →
+  2 Brackets, labor Rs.100/batch) run for 3 batches produced exactly 6 brackets at a
+  hand-verified unit cost of 173.3333 (materialCost 740.00 = 3×206.6667 weighted-avg Steel
+  Sheet + 12×10.0000 Bolt Set, laborCost 300.00, totalCost 1040.00 ÷ 6) — every GL line
+  (Raw Material Inventory credited 740, Salary & Wages credited 300, WIP Dr/Cr 1040 each,
+  Finished Inventory debited 1040) and every stock quantity (Steel Sheet 150→147, Bolts
+  500→488, Brackets 0→6) matched exactly, trial balance balanced throughout. 38/38 tests
+  (10 sales + 8 purchase + 13 assets + 7 manufacturing) green. RBAC verified both ways.
+- **Gaps:** no multi-level BOM UI warning (a FINISHED_GOODS product used as a BOM component —
+  e.g. a sub-assembly — is technically supported by the service layer's role-aware ledger
+  routing, but untested); no "reverse manufacture" / demolish workflow (the reference's
+  `manufacture demolish` counterpart — disassembling a finished good back into components);
+  no production-order cancellation/reversal (Sales/Purchase-style Credit/Debit Note
+  equivalent); no live cost preview before submitting a Production Order.
+
 ### Session 12 — 2026-09-11 (Fixed Assets vertical)
 First industry vertical (v1 scope: core ERP + Fixed Assets/Manufacturing/Workshop/
 Restaurant/Fuel/Printing). The reference app's own nav never exposed enough of this module
@@ -429,7 +486,7 @@ Recommended order & why:
      ⬜ Annex 5/13 exact IRD formats (needs the CBMS pass) · ⬜ PDF/Excel export.
   8. **Dashboard** widgets — ✅ done session 11 (KPIs, sales trend chart, recent activity,
      fully permission-scoped).
-  9. **Verticals:** ✅ Fixed Assets — *done session 12*. ⬜ Manufacturing → Workshop →
+  9. **Verticals:** ✅ Fixed Assets (session 12) → ✅ Manufacturing (session 13) → ⬜ Workshop →
      Restaurant → Fuel/Token → Printing, then **Documents**. *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls
   `postVoucher`/`postStockMovement`) → `/api/<domain>` routes (`requirePermission`) →

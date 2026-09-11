@@ -76,7 +76,7 @@ Present in the reference **backend** but not in this tenant's navigation. Scope 
 | Area | Models | Likely trigger |
 |------|--------|----------------|
 | ~~**Fixed Assets**~~ | ~~asset, asset life (depreciation), …~~ | **✅ built session 12** — see Docs/DATABASE.md |
-| **Manufacturing** | material bill (BOM), manufacture demolish | producers |
+| ~~**Manufacturing**~~ | ~~material bill (BOM), manufacture demolish~~ | **✅ built session 13** — see Docs/DATABASE.md |
 | **Workshop** (auto/repair) | workshop job card, workshop technician | garages |
 | **Restaurant** | restaurant table | F&B |
 | **Fuel dealer** | token entry | petrol pumps (Token nav item = this) |
@@ -139,5 +139,6 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Responsive UI | ✓ | ✅ shell + modules |
 | Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |
 | Fixed Assets (register, depreciation, disposal) | ✓ (minimal in nav) | ✅ built from NFRS accounting principles, keyed to real scraped COA ledgers — see Docs/DATABASE.md |
+| Manufacturing (BOM, Production Order, WIP costing) | ✓ (minimal in nav) | ✅ Raw Material → WIP → Finished Goods, keyed to real scraped COA ledgers, weighted-avg component costing — see Docs/DATABASE.md |
 
 Do not mark complete because a page renders.
