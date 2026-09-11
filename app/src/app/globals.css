@@ -177,3 +177,28 @@ body {
 .brand-pulse { animation: brand-pulse 1.6s ease-in-out infinite; }
 
 html[data-reduce-motion="true"] .brand-pulse { animation: none; }
+
+/* ── Print ───────────────────────────────────────────────────────────────
+   Printed documents (invoices, vouchers, reports) always render on plain
+   white paper with black text, regardless of the viewer's dark-mode/accent
+   preference — hitting "Print" is expected to produce an ink-economical,
+   professional page, not a copy of whatever theme happens to be active.
+   [data-app-chrome] marks the sidebar/header/tab-nav/on-screen-only controls
+   (set in src/components/app-shell.tsx and src/components/tab-nav.tsx) so
+   only the actual document remains. */
+@media print {
+  html, html[data-theme="dark"], :root:not([data-theme="light"]) {
+    color-scheme: light;
+    --background: #ffffff;
+    --surface: #ffffff;
+    --foreground: #000000;
+    --muted: #444444;
+    --border: #cccccc;
+  }
+  [data-app-chrome] { display: none !important; }
+  [data-print-only] { display: block !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+  body { font-size: 12px; }
+  a[href]::after { content: ""; } /* don't print raw URLs after links */
+}
+[data-print-only] { display: none; }

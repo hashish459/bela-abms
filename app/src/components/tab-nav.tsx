@@ -9,7 +9,7 @@ export type Tab = { title: string; href: string };
 export function TabNav({ tabs, exact = true }: { tabs: Tab[]; exact?: boolean }) {
   const pathname = usePathname();
   return (
-    <div className="overflow-x-auto">
+    <div data-app-chrome className="overflow-x-auto">
       <nav className="flex w-max gap-1 rounded-xl border border-border bg-surface p-1">
         {tabs.map((t) => {
           const active = exact ? pathname === t.href : pathname.startsWith(t.href);

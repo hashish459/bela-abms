@@ -42,7 +42,7 @@ export function LedgerReportView() {
         title="Ledger Report"
         action={
           data && (
-            <Button variant="outline" onClick={() => window.print()}>
+            <Button variant="outline" onClick={() => window.print()} data-app-chrome>
               Print
             </Button>
           )

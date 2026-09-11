@@ -17,7 +17,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/accounts/charts-of-accounts` | A · `accounts.charts_of_accounts` | Chart of Accounts | collapsible AS/LI/EQ/IN/EX tree + Add Account |
 | `/dashboard/accounts/contacts` | A · `accounts.contacts` | Contacts | Customers / Suppliers tabs + contact form |
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
-| `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | (uses `voucher-workspace`, page pending) |
+| `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | list + entry form (uses shared `voucher-workspace`) |
+| `/dashboard/vouchers/stock-journal` | A · `vouchers.stock_journal` | Stock Journal | list + entry form; posts GL value gain/loss (`COS-01-0003`) + stock movement, distinct from Inventory Adjustment (qty-only, no GL) |
 | `/dashboard/reports/accounting/trial-balance` | A · `reports.accounting_reports` | Trial Balance | grouped, print |
 | `/dashboard/reports/accounting/ledger` | A · `reports.accounting_reports` | Ledger Report | `LedgerPicker` + running statement |
 | `/dashboard/reports/accounting/profit-loss` | A · `reports.accounting_reports` | Profit & Loss | date range, grouped by account head |
@@ -47,13 +48,15 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
 | `/dashboard/reports/inventory/stock-summary` | A · `reports.inventory_reports` | Stock Summary | on-hand, low-stock flag |
-| `/dashboard/sales/invoice` | A · `sales.sales_invoice` | Sales Invoice | list + form (immutability notice) |
+| `/dashboard/sales/invoice` | A · `sales.sales_invoice` | Sales Invoice | list + form (immutability notice); rows click through to detail |
+| `/dashboard/sales/invoice/[id]` | A · `sales.sales_invoice` read | Sales Invoice detail | printable letterhead + line items + totals |
 | `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
 | `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
 | `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
 | `/dashboard/purchase/purchase-order` | A · `purchase.purchase_order` | Purchase Order | list + form + convert |
-| `/dashboard/purchase/purchase-bills` | A · `purchase.purchase_invoice` | Purchase Invoice | list + form (excise/custom duty columns, immutability notice) |
+| `/dashboard/purchase/purchase-bills` | A · `purchase.purchase_invoice` | Purchase Invoice | list + form (excise/custom duty columns, immutability notice); rows click through to detail |
+| `/dashboard/purchase/purchase-bills/[id]` | A · `purchase.purchase_invoice` read | Purchase Invoice detail | printable letterhead + line items (landed amount) + totals |
 | `/dashboard/purchase/supplier-payment` | A · `purchase.payment` | Payments | list + payment form (against invoice) |
 | `/dashboard/purchase/debit-note` | A · `purchase.debit_notes` | Debit Notes | list + return form (pick invoice) |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
@@ -80,6 +83,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | PATCH | `/api/accounts/contacts/[id]` | A · `accounts.contacts` update | edit contact |
 | GET/POST | `/api/accounts/vouchers` | A · `vouchers.journal_voucher\|contra_voucher` | `?type=JOURNAL\|CONTRA`; POST posts via `postVoucher` (ΣDr=ΣCr enforced) |
 | GET | `/api/accounts/vouchers/[id]` | A · `vouchers.journal_voucher` read | voucher detail with lines |
+| GET/POST | `/api/accounts/stock-journal` | A · `vouchers.stock_journal` | list / create — posts a GL voucher (value gain/loss against `COS-01-0003`) + a stock movement, unlike Inventory Adjustment which is qty-only |
 | GET | `/api/reports/trial-balance` | A · `reports.accounting_reports` read | active FY; `?asOf=` |
 | GET | `/api/reports/ledger/[id]` | A · `reports.accounting_reports` read | running ledger statement |
 | GET/POST | `/api/inventory/categories` | A · `inventory.product_category` | list / create (self-nesting) |

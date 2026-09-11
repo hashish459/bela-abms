@@ -30,7 +30,7 @@ export function DayBookView({ defaultDate }: { defaultDate: string }) {
         crumbs={["Reports", "Accounting", "Day Book"]}
         title="Day Book"
         action={
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} data-app-chrome>
             Print
           </Button>
         }

@@ -48,6 +48,16 @@ export const voucherCreate = z.object({
   lines: z.array(voucherLine).min(2),
 });
 
+export const stockJournalCreate = z.object({
+  date: isoDate,
+  productId: z.string().min(1),
+  warehouseId: z.string().min(1),
+  qty: z.coerce.number().refine((n) => n !== 0, "Quantity cannot be zero"), // signed: + found/increase, - written off/decrease
+  unitCost: z.coerce.number().positive(),
+  narration: z.string().max(300).optional().or(z.literal("")),
+});
+
 export type LedgerCreate = z.infer<typeof ledgerCreate>;
 export type ContactCreate = z.infer<typeof contactCreate>;
 export type VoucherCreate = z.infer<typeof voucherCreate>;
+export type StockJournalCreate = z.infer<typeof stockJournalCreate>;

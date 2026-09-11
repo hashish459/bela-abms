@@ -41,6 +41,7 @@ export function TrialBalanceView({ fyName, data }: { fyName: string; data: TB })
         action={
           <button
             onClick={() => window.print()}
+            data-app-chrome
             className="rounded-lg px-3 py-2 text-sm font-semibold ring-1 ring-border hover:bg-accent-tint"
           >
             Print

@@ -4,7 +4,16 @@ import { db } from "@/lib/db";
 import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { postVoucher, postOpeningBalance, nextNumber } from "./gl";
-import type { ContactCreate, LedgerCreate, VoucherCreate } from "./schemas";
+import { postStockMovement } from "@/server/inventory/stock";
+import type { ContactCreate, LedgerCreate, VoucherCreate, StockJournalCreate } from "./schemas";
+
+const D = (n: Prisma.Decimal.Value) => new Prisma.Decimal(n);
+// Same two ledgers used everywhere goods stock is valued (sales/purchase/manufacturing) —
+// see src/server/manufacturing/ledgers.ts for the fuller category map this mirrors.
+const INVENTORY_ADJUSTMENT_LEDGER = "COS-01-0003"; // "Inventory Adjustment Account"
+function inventoryLedgerCodeFor(role: string): string {
+  return role === "RAW_MATERIAL" ? "INV-02-0001" : "INV-01-0001";
+}
 
 /* ───────────────────────────  Chart of accounts  ──────────────────────── */
 
@@ -361,10 +370,73 @@ export async function createVoucher(
   });
 }
 
+/**
+ * Stock Journal — the one gap Inventory Adjustment deliberately doesn't cover
+ * (Docs/PROGRESS.md session 6: "stock write-offs don't post GL valuation
+ * entry yet"). Inventory Adjustment changes quantity only, with no GL
+ * impact — fine for a routine recount. A Stock Journal is for when a
+ * quantity change ALSO needs to hit the books as a value gain/loss (theft,
+ * breakage, a found-stock correction): it posts both the stock movement AND
+ * a balanced voucher against the NFRS "Inventory Adjustment Account".
+ */
+export async function createStockJournal(
+  companyId: string,
+  fiscalYearId: string | null,
+  actorId: string,
+  input: StockJournalCreate,
+) {
+  if (!fiscalYearId) throw errors.badRequest("No active fiscal year");
+
+  return db.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({
+      where: { id: input.productId, companyId, deletedAt: null },
+      select: { id: true, name: true, kind: true, inventoryRole: true },
+    });
+    if (!product) throw errors.validation(null, "Product not found");
+    if (product.kind !== "GOODS") throw errors.validation(null, `"${product.name}" is not a stocked (GOODS) product`);
+
+    const warehouse = await tx.warehouse.findFirst({ where: { id: input.warehouseId, companyId, deletedAt: null }, select: { id: true } });
+    if (!warehouse) throw errors.validation(null, "Warehouse not found");
+
+    const amount = D(Math.abs(input.qty)).mul(input.unitCost);
+
+    await postStockMovement(tx, {
+      companyId, fiscalYearId, date: new Date(input.date),
+      kind: input.qty > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT",
+      sourceType: "StockJournal", createdById: actorId,
+      lines: [{ productId: product.id, warehouseId: warehouse.id, qty: Math.abs(input.qty).toString(), unitCost: input.unitCost.toString() }],
+    });
+
+    const inventoryLedgerId = await ledgerId(tx, companyId, inventoryLedgerCodeFor(product.inventoryRole));
+    const adjustmentLedgerId = await ledgerId(tx, companyId, INVENTORY_ADJUSTMENT_LEDGER);
+
+    return postVoucher(tx, {
+      companyId, fiscalYearId, date: new Date(input.date), type: "STOCK",
+      narration: input.narration || `Stock journal — ${product.name}`,
+      sourceType: "StockJournal", createdById: actorId,
+      lines: input.qty > 0
+        ? [
+            { ledgerId: inventoryLedgerId, debit: amount.toFixed(2), narration: product.name },
+            { ledgerId: adjustmentLedgerId, credit: amount.toFixed(2) },
+          ]
+        : [
+            { ledgerId: adjustmentLedgerId, debit: amount.toFixed(2) },
+            { ledgerId: inventoryLedgerId, credit: amount.toFixed(2), narration: product.name },
+          ],
+    });
+  });
+}
+
+async function ledgerId(tx: Prisma.TransactionClient, companyId: string, code: string): Promise<string> {
+  const l = await tx.ledger.findFirst({ where: { companyId, code, deletedAt: null }, select: { id: true } });
+  if (!l) throw errors.validation(null, `System account ${code} is missing — re-run the seed`);
+  return l.id;
+}
+
 export async function listVouchers(
   companyId: string,
   fiscalYearId: string | null,
-  type: "JOURNAL" | "CONTRA",
+  type: "JOURNAL" | "CONTRA" | "STOCK",
   opts: { page?: number; pageSize?: number; search?: string } = {},
 ) {
   const page = Math.max(1, opts.page ?? 1);

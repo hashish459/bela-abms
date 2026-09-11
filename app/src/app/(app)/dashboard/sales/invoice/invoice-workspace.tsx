@@ -91,7 +91,11 @@ export function InvoiceWorkspace({
             </thead>
             <tbody className="divide-y divide-border">
               {initial.rows.map((d) => (
-                <tr key={d.id} className="hover:bg-accent-tint">
+                <tr
+                  key={d.id}
+                  onClick={() => router.push(`/dashboard/sales/invoice/${d.id}`)}
+                  className="cursor-pointer hover:bg-accent-tint"
+                >
                   <td className="px-4 py-2.5">{d.date}</td>
                   <td className="px-4 py-2.5 font-medium">{d.number}</td>
                   <td className="px-4 py-2.5">{d.customer}</td>

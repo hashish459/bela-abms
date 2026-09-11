@@ -13,6 +13,64 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 17 — 2026-09-11 (Vouchers UI polish + printed letterhead)
+Client asked for three things: finish the two stubbed voucher pages, place the real
+`bela-logo.png` file the client dropped into `public/` "like letterhead/bill head", and
+(next) build out the remaining Settings sub-pages.
+
+**Vouchers UI polish:**
+- **Contra Voucher** (`src/app/(app)/dashboard/vouchers/contra-voucher/page.tsx`, new) —
+  turned out to need only a thin wrapper: `VoucherWorkspace` and `listVouchers()` were
+  already generic enough to support `type="CONTRA"`, so no service changes were needed.
+- **Stock Journal** (new: `src/server/accounts/schemas.ts` `stockJournalCreate`,
+  `src/server/accounts/service.ts` `createStockJournal()`, `src/app/api/accounts/stock-journal/route.ts`,
+  `src/app/(app)/dashboard/vouchers/stock-journal/{page,stock-journal-workspace}.tsx`) —
+  distinct from the existing Inventory Adjustment feature (quantity-only, no GL impact):
+  Stock Journal posts a real GL voucher for the value gain/loss against the NFRS
+  `COS-01-0003` "Inventory Adjustment Account" ledger, routed against the correct
+  `INV-01-0001`/`INV-02-0001` inventory ledger via the existing `InventoryRole` enum
+  (mirrors `purchase/service.ts`'s pattern). Reuses `postVoucher()` (GL) and
+  `postStockMovement()` (qty) as the sole writers — no duplicated posting logic.
+
+**Letterhead / logo placement** (the literal ask — "place this logo... like letter head
+bill head etc"):
+- `src/components/print-button.tsx` (new) — shared `<PrintButton>`, `data-app-chrome`
+  baked in so callers don't have to remember it.
+- `src/components/print-letterhead.tsx` (new) — `<PrintLetterhead>`: `BrandLogo` + company
+  legal/display name, address, phone(s), email, PAN, plus a document title/number/date
+  block — fed from the existing `getCompanyInfo()` service, no schema changes needed.
+  Deliberately **not** `data-print-only` — it's part of the actual document, shown
+  on-screen and on paper alike, unlike the sidebar/header chrome.
+- **Sales Invoice detail + print page** (new:
+  `src/app/(app)/dashboard/sales/invoice/[id]/{page,invoice-detail-view}.tsx`, using the
+  already-existing `getSalesDoc()` + `/api/sales/invoices/[id]`) and the symmetric
+  **Purchase Invoice detail + print page** (new:
+  `src/app/(app)/dashboard/purchase/purchase-bills/[id]/{page,purchase-invoice-detail-view}.tsx`,
+  `getPurchaseDoc()`) — fills the "no invoice detail/print view" gap noted since session 7.
+  Both list-page workspaces (`invoice-workspace.tsx`, `purchase-invoice-workspace.tsx`)
+  now `router.push()` to the detail view on row click.
+- Favicon/app-icon: `src/app/icon.png`, `src/app/apple-icon.png` (Next.js file-convention,
+  copied from `public/bela-logo.png`); `BrandLogo`'s `LOGO_SRC` and `global-error.tsx`
+  updated to point at the real filename instead of the old placeholder `/logo.png`.
+- Print CSS infrastructure (`src/app/globals.css` `@media print` block, `data-app-chrome`
+  marker on `app-shell.tsx`'s sidebar/header and `tab-nav.tsx`) — forces light color-scheme
+  on print (deliberate: a printed page should be ink-economical and professional
+  regardless of the viewer's dark-mode preference) and hides on-screen-only chrome.
+  Applied to the 6 report Print buttons + trial balance's raw button that pre-dated
+  `<PrintButton>`.
+
+Verified live in-browser (not just typecheck): logged in, clicked through from the Sales
+Invoice and Purchase Invoice list pages to their new detail pages — letterhead renders
+with the real logo, company info, and NFRS-correct totals; Back/Print buttons work.
+`npm run typecheck`, `npx eslint src`, and a clean `rm -rf .next && npm run build` all
+pass with the new `/dashboard/sales/invoice/[id]` and `/dashboard/purchase/purchase-bills/[id]`
+routes compiling as dynamic (ƒ) pages.
+
+**Still pending** (client's explicit next item): the 12 remaining stubbed Settings
+sub-pages (Signin & Security, Users & Permissions, Bill Footer, Bank Detail, Custom
+Fields, Banks, Custom Status, Barcode, Invoice Setting, Invoice Import Setting, Backup
+Data, Tour) — only Company Info/Fiscal Year/Tax are built so far.
+
 ### Session 16 — 2026-09-11 (Enterprise Hardening pass — security + performance)
 The brief's own roadmap (`Docs/MASTER-PROMPT.md` §9, "Enterprise hardening") calls for
 exactly this phase once the modules are built — client asked to proceed with "modern

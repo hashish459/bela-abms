@@ -44,7 +44,7 @@ export function AgingView({
         crumbs={["Reports", crumb, title]}
         title={title}
         action={
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} data-app-chrome>
             Print
           </Button>
         }

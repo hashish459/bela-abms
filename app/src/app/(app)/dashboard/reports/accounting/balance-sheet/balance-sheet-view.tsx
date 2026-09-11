@@ -83,7 +83,7 @@ export function BalanceSheetView({ fyName, defaultAsOf }: { fyName: string; defa
         crumbs={["Reports", "Accounting", "Balance Sheet"]}
         title="Statement of Financial Position"
         action={
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} data-app-chrome>
             Print
           </Button>
         }

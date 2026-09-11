@@ -45,7 +45,7 @@ export function VatReturnView({
         crumbs={["Reports", "Tax", "VAT Return"]}
         title="VAT Return"
         action={
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} data-app-chrome>
             Print
           </Button>
         }

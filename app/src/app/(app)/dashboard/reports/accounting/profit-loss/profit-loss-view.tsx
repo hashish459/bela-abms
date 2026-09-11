@@ -48,7 +48,7 @@ export function ProfitLossView({
         crumbs={["Reports", "Accounting", "Profit & Loss"]}
         title="Statement of Profit & Loss"
         action={
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button variant="outline" onClick={() => window.print()} data-app-chrome>
             Print
           </Button>
         }

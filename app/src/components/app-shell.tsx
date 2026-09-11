@@ -110,6 +110,7 @@ export function AppShell({
     <div className="flex h-dvh overflow-hidden bg-background">
       {/* Sidebar */}
       <aside
+        data-app-chrome
         className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 border-r border-border bg-surface transition-transform lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
@@ -143,7 +144,7 @@ export function AppShell({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+        <header data-app-chrome className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
           <button
             className="lg:hidden"
             onClick={() => setOpen(true)}

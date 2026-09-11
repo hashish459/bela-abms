@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+/** The company's real logo file (see global-error.tsx for the one other place
+ * this is referenced directly — everywhere else should use <BrandLogo>). */
+export const LOGO_SRC = "/bela-logo.png";
+
 /**
- * Renders the company's actual logo file (public/logo.png) at its native
- * aspect ratio, never cropped. Falls back to a simple lettermark chip if the
- * file hasn't been added yet, so the app never looks broken in the meantime.
+ * Renders the company's actual logo file (public/bela-logo.png) at its
+ * native aspect ratio, never cropped. Falls back to a simple lettermark chip
+ * if the file is ever missing, so the app never looks broken.
  *
  * Checks the file with a detached Image() probe rather than the rendered
  * <img>'s own onError: an SSR-rendered <img> starts its network request the
@@ -31,7 +35,7 @@ export function BrandLogo({
     probe.onerror = () => {
       if (!cancelled) setLoaded(false);
     };
-    probe.src = "/logo.png";
+    probe.src = LOGO_SRC;
     return () => {
       cancelled = true;
     };
@@ -51,7 +55,7 @@ export function BrandLogo({
   return (
     // eslint-disable-next-line @next/next/no-img-element -- exact source file, size varies per placement; already confirmed loadable above
     <img
-      src="/logo.png"
+      src={LOGO_SRC}
       alt="Bela Nepal Industries"
       style={{ height: size, width: "auto" }}
       className={`shrink-0 object-contain ${className}`}

@@ -12,7 +12,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
       <body className="grid min-h-dvh place-items-center bg-background px-4 text-foreground">
         <div className="w-full max-w-md text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Bela Nepal Industries" className="mx-auto mb-6 h-16 w-auto object-contain" />
+          <img src="/bela-logo.png" alt="Bela Nepal Industries" className="mx-auto mb-6 h-16 w-auto object-contain" />
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-danger/10 text-danger">
             <span className="text-3xl">⚠</span>
           </div>
