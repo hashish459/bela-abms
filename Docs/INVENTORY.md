@@ -75,7 +75,7 @@ Present in the reference **backend** but not in this tenant's navigation. Scope 
 
 | Area | Models | Likely trigger |
 |------|--------|----------------|
-| **Fixed Assets** | asset, asset life (depreciation), asset expense, capitalization, purchase asset, purchase order asset, sell asset, lost stole broken, ownership letter | asset-heavy businesses (marketing site advertises it) |
+| ~~**Fixed Assets**~~ | ~~asset, asset life (depreciation), …~~ | **✅ built session 12** — see Docs/DATABASE.md |
 | **Manufacturing** | material bill (BOM), manufacture demolish | producers |
 | **Workshop** (auto/repair) | workshop job card, workshop technician | garages |
 | **Restaurant** | restaurant table | F&B |
@@ -138,5 +138,6 @@ Fiscal year · Custom fields · Banks · Tax · Barcode · Invoice Setting · In
 | Supplier Payment / Debit Note | ✓ | ✅ payment updates invoice status; debit note reverses GL+stock at its own valuation |
 | Responsive UI | ✓ | ✅ shell + modules |
 | Audit logging | ✓ | ✅ infra + login/logout + CREATE/UPDATE/DELETE/POST_VOUCHER |
+| Fixed Assets (register, depreciation, disposal) | ✓ (minimal in nav) | ✅ built from NFRS accounting principles, keyed to real scraped COA ledgers — see Docs/DATABASE.md |
 
 Do not mark complete because a page renders.

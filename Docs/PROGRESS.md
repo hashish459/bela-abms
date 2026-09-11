@@ -13,6 +13,61 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 12 — 2026-09-11 (Fixed Assets vertical)
+First industry vertical (v1 scope: core ERP + Fixed Assets/Manufacturing/Workshop/
+Restaurant/Fuel/Printing). The reference app's own nav never exposed enough of this module
+to reverse-engineer a workflow from (Docs/ASSUMPTIONS.md A13 — "minimal in nav"), so this was
+built from standard NFRS fixed-asset accounting — but keyed onto **real ledger codes already
+scraped from the reference's own chart of accounts** in session 5 (`PPE-01..09`, `ADE-06`,
+`ADE-17`, `OIC-01`), not invented ones. Full writeup in Docs/DATABASE.md.
+
+- Prisma: `FixedAsset` (subsidiary register — never its own GL ledger, mirrors how `Product`
+  works for Inventory), `AssetDepreciationEntry` (subsidiary ledger — accumulated depreciation
+  is always `Σ entries`, mirrors `StockMovement`'s "derived, never mutable" pattern),
+  `DepreciationRun` (one GL voucher per batch run). New enums `AssetCategory` (9 values = the
+  real NFRS PPE sub-groups), `DepreciationMethod`, `AssetStatus`, `DisposalType`. Extended
+  `VoucherType` with `ASSET`/`DEPRECIATION`/`ASSET_DISPOSAL` (own number prefixes FA/DEP/AD),
+  matching the existing per-document-type pattern. 3 migrations (models, enum values, one
+  nullability fix caught before it shipped).
+- **`src/server/assets/ledgers.ts`** — the category→ledger map, hardcoded from the scraped
+  COA: Building→PPE-01, Computer→PPE-02, Furniture&Fixture→PPE-03, Land→PPE-04 (never
+  depreciated — no accum-dep/expense ledger exists for it under NFRS), Leasehold Dev→PPE-05,
+  Office Equipment→PPE-06, Other Assets→PPE-07, Plant&Machinery→PPE-08, Vehicles→PPE-09, each
+  paired with its `ADE-06-000x` "Depreciation On …" expense ledger. Disposal gain/loss →
+  `OIC-01-0002` "Profit On Sale Of Assets" / `ADE-17-0001` "Loss On Sale Of Assets".
+- **`src/server/assets/calc.ts`** (pure, 13 Vitest tests) — `monthsBetween()` (whole completed
+  calendar months only — a partial month is skipped this run, not double-charged next time)
+  and `calcDepreciation()`: Straight-Line = `(cost−salvage)÷usefulLifeMonths×months`;
+  Written-Down-Value = `bookValue×annualRate%×(months÷12)`; both capped so book value never
+  drops below salvage.
+- **`src/server/assets/service.ts`**: `createFixedAsset` (Dr Asset-at-cost / Cr
+  Supplier-or-Cash-Bank), `runDepreciation` (batches every due asset into ONE voucher with
+  lines grouped per category: Dr Depreciation Expense / Cr Accum. Depreciation — rejects if
+  nothing is due, preventing an accidental duplicate run), `disposeAsset` (auto-posts a final
+  partial-period catch-up depreciation first, then Dr Accum.Dep [full] + Dr Proceeds [if any]
+  + Dr Loss-or-Cr Gain / Cr Asset-at-cost [full] — the loss/gain plug is whichever side the
+  math lands on).
+- API: `/api/assets` (list/create), `/api/assets/[id]` (detail + full depreciation history),
+  `/api/assets/[id]/dispose`, `/api/assets/depreciation-runs` (list/run). New permission group
+  `fixed_assets` (`asset_register`, `depreciation`) — **not** granted to Cashier.
+- UI: new "Fixed Assets" top-level nav item → Asset Register (list, Add Asset modal with
+  category-conditional straight-line/WDV fields, click-through detail modal showing full
+  depreciation history, per-row Dispose) + Depreciation (run history, "Run Depreciation" modal).
+- **Verified end-to-end via curl with hand-calculated numbers** — created a Vehicle
+  (straight-line, cash), Office Equipment (WDV, credit), and Land (never depreciated):
+  acquisition postings landed on the exact expected PPE ledgers; a depreciation run charged
+  67,500.00 (Vehicle, 3 months × Rs.22,500/mo) + 5,333.33 (Photocopier, WDV prorated 4/12) =
+  72,833.33 — both hand-verified exactly; re-running the same date correctly rejected
+  ("nothing due"); disposing the Vehicle two months later auto-posted a 22,500 catch-up
+  entry, then correctly computed book value 1,410,000 and a **10,000 loss** against
+  1,400,000 proceeds — Dr Accum.Dep 90,000 + Dr Cash 1,400,000 + Dr Loss 10,000 = Cr Vehicles
+  1,500,000, trial balance balanced throughout every step. tsc + eslint + build +
+  **31/31 tests** (10 sales + 8 purchase + 13 assets) green. RBAC verified both ways (Cashier's
+  `/api/menu` omits Fixed Assets entirely; a direct curl to `/api/assets` as Cashier gets 403).
+- **Gaps:** no "capitalize from an existing Purchase Invoice" integration (assets are created
+  directly, not converted from a PurchaseDoc line) — noted as a possible future enhancement,
+  not attempted this session; no bulk asset import; no asset transfer between locations.
+
 ### Session 11 — 2026-09-11 (Module 7 — Dashboard KPIs)
 - **`src/server/dashboard/service.ts`** (new): `salesSummary`/`purchaseSummary` (net of
   Credit/Debit Notes, FY-to-date), `cashAndBankBalance` (Σ Dr−Cr across every ledger under the
@@ -374,8 +429,8 @@ Recommended order & why:
      ⬜ Annex 5/13 exact IRD formats (needs the CBMS pass) · ⬜ PDF/Excel export.
   8. **Dashboard** widgets — ✅ done session 11 (KPIs, sales trend chart, recent activity,
      fully permission-scoped).
-  9. **Documents**, then **verticals** (Fixed Assets → Manufacturing → Workshop → Restaurant →
-     Fuel/Token → Printing). *CRM, Budget, Store Builder = post-v1.*
+  9. **Verticals:** ✅ Fixed Assets — *done session 12*. ⬜ Manufacturing → Workshop →
+     Restaurant → Fuel/Token → Printing, then **Documents**. *CRM, Budget, Store Builder = post-v1.*
 - Each module: Prisma models → migration → Zod validators → service (tx, calls
   `postVoucher`/`postStockMovement`) → `/api/<domain>` routes (`requirePermission`) →
   UI page replacing the stub → Vitest (calc + posting) + Playwright (workflow).

@@ -135,10 +135,34 @@ lines (Service/Expense products, or no product) instead Dr the "Purchase" expens
 (`COS-01-0001`). VAT here is **Input VAT** (`Vat Receivable`, `ONFA-C-06-0001`), the mirror of
 Sales' VAT Payable.
 
-### Fixed Assets  ⚠️ present in backend, minimal in nav
-`asset` · `asset life` (depreciation schedule) · `asset expense` · `capitalization` ·
-`purchase asset` · `purchase order asset` · `sell asset` · `lost stole broken` ·
-`ownership letter`.
+### Fixed Assets — ✅ BUILT (session 12)
+Reference backend model names only (`asset`, `asset life`, `sell asset`, `lost stole broken`,
+…) — the reference's own nav never exposed enough of this module to reverse-engineer a
+workflow (Docs/ASSUMPTIONS.md A13), so this vertical was built from standard NFRS fixed-asset
+accounting instead, keyed onto ledgers **scraped from the same reference COA** (not invented):
+
+| Reference | Clone | Notes |
+|---|---|---|
+| `asset` (register) | **`FixedAsset`** ✅ | subsidiary register, like `Product` for Inventory — never its own GL ledger. `assetCode` ("FA-00001"), `category` (9-value enum matching real NFRS PPE sub-groups), `acquisitionCost`, `salvageValue`, `depreciationMethod`, `usefulLifeMonths` \| `depreciationRatePct` |
+| `asset life` (depreciation schedule) | **`AssetDepreciationEntry`** ✅ | subsidiary ledger — accumulated depreciation is ALWAYS `Σ entries`, never a mutable field, mirroring `StockMovement`'s pattern |
+| — | **`DepreciationRun`** ✅ | one GL voucher per batch run, lines grouped per category |
+| `purchase asset` (capitalization) | `createFixedAsset()` ✅ | posts Dr Asset-at-cost / Cr Supplier-or-Cash-Bank |
+| `sell asset` / `lost stole broken` | `disposeAsset()` ✅ | auto-posts a final partial-period depreciation catch-up, then Dr Accum.Dep + Dr Proceeds + Dr/Cr Loss-or-Gain / Cr Asset-at-cost |
+
+**Category → ledger mapping** (`src/server/assets/ledgers.ts`, real NFRS codes from the
+scraped COA — see session 5): Building→PPE-01, Computer→PPE-02, Furniture&Fixture→PPE-03,
+Land→PPE-04 (never depreciated), Leasehold Development→PPE-05, Office Equipment→PPE-06,
+Other Assets→PPE-07, Plant&Machinery→PPE-08, Vehicles→PPE-09 — each with its own
+`-0001` (asset at cost) / `-0002` (accumulated depreciation) ledger pair, plus a matching
+`ADE-06-000x` "Depreciation On …" expense ledger. Gain/loss on disposal: `OIC-01-0002`
+"Profit On Sale Of Assets" / `ADE-17-0001` "Loss On Sale Of Assets".
+
+**Depreciation math** (`src/server/assets/calc.ts`, pure, 13 Vitest tests): Straight-Line =
+`(cost − salvage) ÷ usefulLifeMonths × wholeMonthsElapsed`; Written-Down-Value = current book
+value × annual rate% × (months ÷ 12); both capped so book value never drops below salvage.
+`monthsBetween()` counts only whole completed calendar months since the asset's last
+depreciation entry (or acquisition, if never run) — an asset under a month past due is
+skipped, never double-charged later.
 
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·

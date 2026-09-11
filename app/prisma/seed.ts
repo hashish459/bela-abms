@@ -59,6 +59,11 @@ const PERMISSION_CATALOGUE: Array<{ key: string; name: string; modules: string[]
     modules: ["Journal Voucher", "Contra Voucher", "Stock Journal"],
   },
   {
+    key: "fixed_assets",
+    name: "Fixed Assets",
+    modules: ["Asset Register", "Depreciation"],
+  },
+  {
     key: "accounts",
     name: "Accounts",
     modules: ["Charts of Accounts", "Cash & Bank Account", "Contacts", "Balance Confirmation"],
@@ -176,6 +181,13 @@ const MENU: MenuSeed[] = [
       { title: "Journal Voucher", route: "/dashboard/vouchers/journal-voucher", permissionKey: "vouchers.journal_voucher" },
       { title: "Contra Voucher", route: "/dashboard/vouchers/contra-voucher", permissionKey: "vouchers.contra_voucher" },
       { title: "Stock Journal", route: "/dashboard/vouchers/stock-journal", permissionKey: "vouchers.stock_journal" },
+    ],
+  },
+  {
+    title: "Fixed Assets", route: "/dashboard/fixed-assets/register", icon: "building-2",
+    children: [
+      { title: "Asset Register", route: "/dashboard/fixed-assets/register", permissionKey: "fixed_assets.asset_register" },
+      { title: "Depreciation", route: "/dashboard/fixed-assets/depreciation", permissionKey: "fixed_assets.depreciation" },
     ],
   },
   {

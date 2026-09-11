@@ -35,6 +35,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/help/roles-permissions` | A · `help.user_manuals` | Roles & Permissions manual | RBAC model explained |
 | `/dashboard/system/info` | A · `system.system_info` | System Info | app/process/host/DB/network diagnostics, module record counts |
 | `/dashboard/system/query` | A · `system.database_console` | Database Console | read-only SQL console (SELECT/WITH only, admin-only) |
+| `/dashboard/fixed-assets/register` | A · `fixed_assets.asset_register` | Asset Register | list + add form + detail (depreciation history) + dispose |
+| `/dashboard/fixed-assets/depreciation` | A · `fixed_assets.depreciation` | Depreciation | run history + "Run Depreciation" |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
@@ -103,6 +105,10 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |
 | GET | `/api/system/info` | A · `system.system_info` read | process/host/DB latency/network + per-module record counts |
 | POST | `/api/system/query` | A · `system.database_console` read | read-only diagnostic SQL (SELECT/WITH only, 200-row cap, audited) |
+| GET/POST | `/api/assets` | A · `fixed_assets.asset_register` | list / create (posts Dr Asset-at-cost / Cr Supplier-or-Cash-Bank) |
+| GET | `/api/assets/[id]` | A · `fixed_assets.asset_register` read | detail incl. full depreciation-entry history |
+| POST | `/api/assets/[id]/dispose` | A · `fixed_assets.asset_register` update | catch-up depreciation + Dr AccumDep/Proceeds/Loss / Cr Asset+Gain |
+| GET/POST | `/api/assets/depreciation-runs` | A · `fixed_assets.depreciation` | list runs / post a batch run (one voucher, grouped per category) |
 | GET | `/api/reports/profit-loss` | A · `reports.accounting_reports` read | `?from&to`; income vs expense by account head |
 | GET | `/api/reports/balance-sheet` | A · `reports.accounting_reports` read | `?asOf`; assets vs liabilities+equity+current-year-profit |
 | GET | `/api/reports/day-book` | A · `reports.accounting_reports` read | `?date`; every voucher posted that day |

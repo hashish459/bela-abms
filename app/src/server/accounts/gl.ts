@@ -40,6 +40,9 @@ const NUMBER_PREFIX: Record<VoucherType, string> = {
   CREDIT_NOTE: "CN",
   DEBIT_NOTE: "DN",
   EXPENSE: "EX",
+  ASSET: "FA",
+  DEPRECIATION: "DEP",
+  ASSET_DISPOSAL: "AD",
 };
 
 /**

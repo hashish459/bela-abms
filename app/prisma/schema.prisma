@@ -47,6 +47,8 @@ model Company {
   receipts             Receipt[]
   purchaseDocs         PurchaseDoc[]
   supplierPayments     SupplierPayment[]
+  fixedAssets          FixedAsset[]
+  depreciationRuns     DepreciationRun[]
 }
 
 model Branch {
@@ -83,6 +85,8 @@ model FiscalYear {
   receipts         Receipt[]
   purchaseDocs     PurchaseDoc[]
   supplierPayments SupplierPayment[]
+  fixedAssets      FixedAsset[]
+  depreciationRuns DepreciationRun[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -424,6 +428,9 @@ enum VoucherType {
   CREDIT_NOTE
   DEBIT_NOTE
   EXPENSE
+  ASSET
+  DEPRECIATION
+  ASSET_DISPOSAL
 }
 
 /// Every financial document posts one balanced Voucher via postVoucher(). Reports read
@@ -982,6 +989,121 @@ model SupplierPayment {
   @@unique([companyId, number])
   @@index([companyId, date])
   @@index([supplierLedgerId])
+}
+
+/// ───────────────────────────  FIXED ASSETS  ───────────────────────────
+/// Each category maps 1:1 to a real NFRS ledger triple scraped from the reference
+/// (Asset-at-cost / Accumulated Depreciation / Depreciation expense) — see
+/// src/server/assets/ledgers.ts. FixedAsset is a SUBSIDIARY register (like Product for
+/// Inventory): individual assets are never their own GL ledger. AssetDepreciationEntry is
+/// the single source of truth for accumulated depreciation (never a mutable stored field),
+/// mirroring StockMovement's "current value = Σ history" pattern.
+enum AssetCategory {
+  BUILDING
+  COMPUTER
+  FURNITURE_FIXTURE
+  LAND
+  LEASEHOLD_DEVELOPMENT
+  OFFICE_EQUIPMENT
+  OTHER_ASSETS
+  PLANT_MACHINERY
+  VEHICLES
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  WRITTEN_DOWN_VALUE
+}
+
+enum AssetStatus {
+  ACTIVE
+  DISPOSED
+}
+
+enum DisposalType {
+  SOLD
+  SCRAPPED
+  LOST_STOLEN_BROKEN
+}
+
+model FixedAsset {
+  id           String        @id @default(cuid())
+  companyId    String
+  fiscalYearId String // FY of acquisition
+  assetCode    String // "FA-00001"
+  name         String
+  category     AssetCategory
+  serialNumber String?
+  location     String?
+  notes        String?
+
+  acquisitionDate     DateTime           @db.Date
+  acquisitionCost     Decimal            @db.Decimal(18, 2)
+  salvageValue        Decimal            @default(0) @db.Decimal(18, 2)
+  depreciationMethod  DepreciationMethod @default(STRAIGHT_LINE)
+  usefulLifeMonths    Int? // STRAIGHT_LINE
+  depreciationRatePct Decimal?           @db.Decimal(7, 4) // WRITTEN_DOWN_VALUE, annual %
+
+  paymentMode      PaymentMode @default(CREDIT) // CASH/BANK -> paymentLedgerId; CREDIT -> supplierLedgerId
+  paymentLedgerId  String?
+  supplierLedgerId String?
+
+  status            AssetStatus   @default(ACTIVE)
+  disposalDate      DateTime?     @db.Date
+  disposalType      DisposalType?
+  disposalProceeds  Decimal?      @db.Decimal(18, 2)
+  disposalLedgerId  String? // cash/bank credited with sale proceeds
+  disposalVoucherId String?       @unique
+
+  voucherId   String?  @unique // acquisition voucher
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  company             Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear          FiscalYear               @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  depreciationEntries AssetDepreciationEntry[]
+
+  @@unique([companyId, assetCode])
+  @@index([companyId, category])
+  @@index([companyId, status])
+}
+
+/// One row per asset per depreciation run (or per disposal catch-up run) — the subsidiary
+/// ledger that accumulated depreciation is always derived from.
+model AssetDepreciationEntry {
+  id          String   @id @default(cuid())
+  assetId     String
+  runId       String
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+  amount      Decimal  @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+
+  asset FixedAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  run   DepreciationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([runId])
+}
+
+/// One GL voucher per batch run (grouped Dr Depreciation Expense / Cr Accum. Depreciation
+/// per category) — or a single-asset run posted just before a disposal.
+model DepreciationRun {
+  id           String   @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  asOfDate     DateTime @db.Date
+  assetCount   Int
+  totalAmount  Decimal  @db.Decimal(18, 2)
+  voucherId    String   @unique
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear               @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  entries    AssetDepreciationEntry[]
+
+  @@index([companyId, fiscalYearId])
 }
 
 /// ─────────────────────────────  AUDIT  ──────────────────────────────

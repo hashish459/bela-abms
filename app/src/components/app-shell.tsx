@@ -26,6 +26,7 @@ import {
   Settings,
   BookOpen,
   Activity,
+  Building2,
   Dot,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -72,6 +73,8 @@ function navIcon(name: string | null, size = 16): ReactNode {
       return <BookOpen size={size} />;
     case "activity":
       return <Activity size={size} />;
+    case "building-2":
+      return <Building2 size={size} />;
     default:
       return <Dot size={size} />;
   }
