@@ -154,6 +154,10 @@ export const invoiceSettingUpdate = z.object({
   defaultNotes: z.string().max(2000).optional().or(z.literal("")),
 });
 
+export const printingTemplateUpdate = z.object({
+  template: z.enum(["CLASSIC", "MODERN", "COMPACT", "THERMAL", "DUAL_COPY"]),
+});
+
 /* ─────────────────────────  Invoice import template  ────────────────────── */
 
 export const invoiceImportTemplateCreate = z.object({
@@ -191,6 +195,7 @@ export type CustomStatusCreate = z.infer<typeof customStatusCreate>;
 export type CustomStatusUpdate = z.infer<typeof customStatusUpdate>;
 export type BarcodeSettingUpdate = z.infer<typeof barcodeSettingUpdate>;
 export type InvoiceSettingUpdate = z.infer<typeof invoiceSettingUpdate>;
+export type PrintingTemplateUpdate = z.infer<typeof printingTemplateUpdate>;
 export type InvoiceImportTemplateCreate = z.infer<typeof invoiceImportTemplateCreate>;
 export type InvoiceImportTemplateUpdate = z.infer<typeof invoiceImportTemplateUpdate>;
 export type BillFooterUpdate = z.infer<typeof billFooterUpdate>;

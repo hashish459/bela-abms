@@ -18,6 +18,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/bank-detail` | A · `settings.bank_detail` | Bank Detail | company's own bank accounts; default one feeds Bill Footer |
 | `/dashboard/settings/bill-footer` | A · `settings.bill_footer` | Bill Footer | terms, bank account, signatory, note — printed on Sales/Purchase invoice detail+print pages |
 | `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
+| `/dashboard/settings/printing-templates` | A · `settings.printing_templates` | Printing Templates | gallery of 5 live-rendered print layouts for Sales/Purchase Invoice (session 25) — new permission module, not previously seeded |
 | `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module — active fields render dynamically on that module's entry form (session 22) |
 | `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
 | `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config; both CODE128 and EAN13 (session 22) render for real |
@@ -87,7 +88,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/reports/inventory/batch-wise-stock-summary` | A · `reports.inventory_reports` | Batch Wise Stock Summary | on-hand per batch/lot; populated once a Purchase Invoice line records a batch number |
 | `/dashboard/reports/inventory/expiry-management` | A · `reports.inventory_reports` | Expiry Management | batches with stock on hand that are expired or expiring within 90 days |
 | `/dashboard/sales/invoice` | A · `sales.sales_invoice` | Sales Invoice | list + form (immutability notice); rows click through to detail |
-| `/dashboard/sales/invoice/[id]` | A · `sales.sales_invoice` read | Sales Invoice detail | printable letterhead + line items + totals |
+| `/dashboard/sales/invoice/[id]` | A · `sales.sales_invoice` read | Sales Invoice detail | renders via the selected Settings › Printing Templates layout (session 25); line items + totals + amount-in-words |
 | `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
 | `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
@@ -98,7 +99,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/sales/receivable` | A · `sales.receivable_amount` | Receivable Amount | flat, actionable outstanding-invoice list (session 24) — reuses the same computation as Reports › Aging Report |
 | `/dashboard/purchase/purchase-order` | A · `purchase.purchase_order` | Purchase Order | list + form + convert |
 | `/dashboard/purchase/purchase-bills` | A · `purchase.purchase_invoice` | Purchase Invoice | list + form (excise/custom duty columns, immutability notice); rows click through to detail |
-| `/dashboard/purchase/purchase-bills/[id]` | A · `purchase.purchase_invoice` read | Purchase Invoice detail | printable letterhead + line items (landed amount) + totals |
+| `/dashboard/purchase/purchase-bills/[id]` | A · `purchase.purchase_invoice` read | Purchase Invoice detail | renders via the selected Settings › Printing Templates layout (session 25), bank details always suppressed; line items (landed amount) + totals + amount-in-words |
 | `/dashboard/purchase/expenses` | A · `purchase.expenses` | Expenses | list + entry (session 24) — reuses `<VoucherWorkspace type="EXPENSE">`, same component as Journal/Contra Voucher |
 | `/dashboard/purchase/goods-received` | A · `purchase.goods_received` | Goods Received | GRN list + form, optionally prefilled from a Purchase Order (session 24) — no stock/GL impact |
 | `/dashboard/purchase/supplier-payment` | A · `purchase.payment` | Payments | list + payment form (against invoice) |
@@ -142,6 +143,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | PATCH/DELETE | `/api/settings/custom-status/[id]` | A · `settings.custom_status` update/delete | |
 | GET/PUT | `/api/settings/barcode` | A · `settings.barcode` view/update | singleton `BarcodeSetting` |
 | GET/PUT | `/api/settings/invoice-setting` | A · `settings.invoice_setting` view/update | singleton `InvoiceSetting`, read by the invoice print pages |
+| GET/PUT | `/api/settings/printing-template` | A · `settings.printing_templates` view/update | `InvoiceSetting.template` only (session 25) — applies immediately, no separate publish step |
 | GET/POST | `/api/settings/invoice-import-templates` | A · `settings.invoice_import_setting` view/create | CSV column-mapping templates |
 | PATCH/DELETE | `/api/settings/invoice-import-templates/[id]` | A · `settings.invoice_import_setting` update/delete | |
 | GET/PUT | `/api/settings/bill-footer` | A · `settings.bill_footer` view/update | singleton `BillFooterSetting`, read by the invoice print pages |

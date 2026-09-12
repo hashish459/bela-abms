@@ -230,7 +230,7 @@ from the platform foundation; only the UI (a full CRUD permission-matrix editor)
 | **`CustomFieldValue`** | Session 22: the value a `CustomField` takes on one specific record — `companyId`, `customFieldId→CustomField`, `entityId`, `value` (`String?`, all types stored as text; CHECKBOX as `"true"`/`"false"`), `@@unique([customFieldId, entityId])`. `entityId` is deliberately **not** a real FK: this table is polymorphic across whichever entity the field's `module` names (`SalesDoc`, `PurchaseDoc`, `Product`, `Ledger`-as-contact, `JobCard`), so there's no single table to point at — an orphaned row after the entity is deleted is just invisible metadata, not a data-integrity risk. `src/server/custom-fields/service.ts` centralizes read (`listActiveCustomFields`, `getCustomFieldValuesForEntity[s]`, `summarizeCustomFields`) and write (`prepareCustomFieldValues` validates required-ness *before* the entity is created inside a transaction; `saveCustomFieldValues` persists *after*, once the new `entityId` exists) for all five modules. `GET /api/custom-fields?module=X` (any signed-in user with a company — not gated on `settings.custom_fields`, which governs managing definitions, not using them) feeds the dynamic `<CustomFieldsFields>` component that every entry form renders unconditionally. Sales/Purchase Invoice values are set only at creation, matching their existing immutable-once-posted convention — no edit/update path exists for either. Product/Contact show their values as a compact summarized list column (`CustomFieldsDisplay`/`summarizeCustomFields`); Job Card, Sales Invoice, and Purchase Invoice show them on their existing detail view/modal. |
 | **`CustomStatus`** | descriptive per-module labels (`module`, `label`, `color`). Session 20: `SalesDoc.customStatusId` / `PurchaseDoc.customStatusId` (nullable FK, `onDelete: SetNull`) let a specific invoice be tagged with one — editable any time via `PATCH /api/sales/invoices/[id]` / `PATCH /api/purchase/invoices/[id]`, shown/changed from a dropdown on the invoice detail page (hidden on the printed copy via `data-app-chrome`). `SalesDoc`/`PurchaseDoc.status` itself still stays on its fixed enum since GL posting depends on it — this tag is additive metadata layered alongside it, not a replacement. |
 | **`BarcodeSetting`** | singleton per company (`@unique companyId`); symbology/prefix/label size. Session 20: `Product.barcodeValue` (nullable, `@@unique([companyId, barcodeValue])`) claims a value from `prefix + nextNumber` (zero-padded, atomically incremented) via `generateProductBarcode()`; rendered as a real scannable Code 128B symbol by `src/lib/barcode.ts` (pure-JS encoder, ISO/IEC 15417 pattern table — ~100 lines, no dependency) + `src/components/barcode-svg.tsx`. Session 22: `src/lib/barcode.ts` also gained a real `encodeEAN13()` (standard GS1 L/G/R module tables + guard bars) and `ean13CheckDigit()` (mod-10 weighted check digit) — `<BarcodeSvg symbology>` now picks the right encoder. `generateProductBarcode()` is symbology-aware: for EAN13 it packs the prefix's digit characters into the first 6 digits (zero-padded/truncated) and the counter into the last 6, computing a real check digit for the 13th — the setting's free-text `prefix` (meant for CODE128 labels) isn't itself EAN13-safe, so this reconciles the two rather than requiring the admin to re-configure. A value generated under one symbology that's since switched won't parse under the other (e.g. a 6-digit CODE128 value isn't 13 numeric digits) — the label page detects this and shows an explicit message rather than crashing, since there's no companion field recording which symbology a stored value was generated under. |
-| **`InvoiceSetting`** | singleton per company; column-visibility toggles + default terms/notes, read live by the Sales/Purchase invoice print pages built in session 17 |
+| **`InvoiceSetting`** | singleton per company; column-visibility toggles + default terms/notes, read live by the Sales/Purchase invoice print pages built in session 17. Session 25: gained `template` (`String @default("CLASSIC")`, not an enum — a new layout ships without a migration) selecting which of 5 print layouts (Settings › Printing Templates, `src/components/invoice-templates/`) both invoice types render with |
 | **`InvoiceImportTemplate`** | CSV column-mapping template (`columnMap` json) — **MVP scope: mapping only**, upload/parse pipeline is a follow-on |
 | **`BillFooterSetting`** | singleton per company; terms, `bankAccountId→BankAccount`, signatory, footer note — printed on the same invoice print pages |
 
@@ -240,6 +240,48 @@ from the platform foundation; only the UI (a full CRUD permission-matrix editor)
 toggling "Show HS Code column" off in Settings immediately changes what prints on every
 invoice. Purchase invoices intentionally never print the company's own bank details (a
 payable, not a receivable) even though the setting is shared.
+
+### Printing Templates — ✅ BUILT (session 25)
+Client asked to clone the reference app's Settings › Printing Templates gallery
+(`bela.nepalebilling.com/dashboard/settings/printing-templates`), which offers ~40 near-
+duplicate layout variations per document type. Deliberately built 5 genuinely distinct,
+professionally designed templates instead of cloning the full count — quality/variety over
+quantity, the same "reinterpret rather than copy wholesale" judgment call as Budget
+(session 21): **Classic** (the pre-existing layout, now one option among several rather than
+the only one), **Modern** (navy/orange brand-gradient header, shaded table, a bold "GRAND
+TOTAL" callout band — uses the real brand colors from `globals.css`, not generic ones),
+**Compact** (dense single-page A5 layout), **Thermal Receipt** (narrow 80mm POS-style,
+dashed separators, monospace), **Dual Copy** (Original + Customer Copy stacked on one A4
+sheet with a cut-line, the common Nepali carbon-copy business practice observed in the
+reference gallery). Scoped to Sales + Purchase Invoice only (the reference also has separate
+galleries per document type — e.g. Receipt — which is out of scope here).
+
+Each template is a self-contained component in `src/components/invoice-templates/` sharing
+one `InvoiceTemplateData` type (a superset covering both invoice types — `partyLabel`/
+`partyName` instead of hardcoding "customer" vs "supplier", `amountColumnLabel` instead of
+hardcoding "Amount" vs "Landed Amount"), dispatched by `<InvoiceTemplateRenderer template=…>`.
+Both `invoice-detail-view.tsx` (Sales) and `purchase-invoice-detail-view.tsx` (Purchase) map
+their own `doc` shape into this common type before rendering — Purchase's mapping hardcodes
+`showBankDetails`/`showQrCode` to `false` regardless of the real setting, preserving the
+existing "Purchase never prints the company's own bank details" rule from above across every
+template, not just the one hardcoded layout that rule used to live in.
+
+**New:** `src/lib/number-to-words.ts` (`amountInWords()`) — Indian/Nepali lakh/crore-grouped
+amount-in-words, e.g. "Rupees Twelve Lakh Thirty Four Thousand Five Hundred Sixty Seven and
+Fifty Paisa Only". A standard line on a Nepali tax invoice that was absent from this app's
+print output entirely until now; every template includes it. Strips thousand-separator
+commas before parsing (a real bug caught during verification — the Settings gallery's sample
+data used comma-formatted amounts, which silently parsed to `NaN`→0 before the fix).
+
+The Settings page itself (`/dashboard/settings/printing-templates`, new permission
+`settings.printing_templates` — unlike session 24's 12 items, this page didn't exist in the
+seed data at all and needed a fresh `PermissionModule`/`MenuItem` pair added to
+`prisma/seed.ts`) renders all 5 templates live at reduced scale (`transform: scale()`, not a
+static screenshot) against one shared realistic sample invoice, so the gallery always reflects
+the current code — a thumbnail can never drift out of sync with what actually prints. A
+"Preview" button opens the same live render full-size in a modal. Selecting a template PUTs
+`/api/settings/printing-template` and applies immediately company-wide, exactly like the
+reference app's own instant-apply behavior (no separate publish/save step).
 
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·

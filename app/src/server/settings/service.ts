@@ -26,6 +26,7 @@ import type {
   CustomStatusUpdate,
   BarcodeSettingUpdate,
   InvoiceSettingUpdate,
+  PrintingTemplateUpdate,
   InvoiceImportTemplateCreate,
   InvoiceImportTemplateUpdate,
   BillFooterUpdate,
@@ -682,7 +683,7 @@ export async function getInvoiceSetting(companyId: string) {
   return (
     row ?? {
       companyId, showHsCode: true, showDiscountColumn: true, showBankDetails: true,
-      showQrCode: true, defaultTermsText: null, defaultNotes: null,
+      showQrCode: true, template: "CLASSIC", defaultTermsText: null, defaultNotes: null,
     }
   );
 }
@@ -695,6 +696,18 @@ export async function upsertInvoiceSetting(companyId: string, actorId: string, i
   };
   const saved = await db.invoiceSetting.upsert({ where: { companyId }, create: { companyId, ...data }, update: data });
   await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "InvoiceSetting", entityId: saved.id });
+  return saved;
+}
+
+/** Settings › Printing Templates — a single active template selection, shared
+ * by Sales and Purchase Invoice print pages (src/components/invoice-templates). */
+export async function updatePrintingTemplate(companyId: string, actorId: string, input: PrintingTemplateUpdate) {
+  const saved = await db.invoiceSetting.upsert({
+    where: { companyId },
+    create: { companyId, template: input.template },
+    update: { template: input.template },
+  });
+  await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "InvoiceSetting", entityId: saved.id, meta: { template: input.template } });
   return saved;
 }
 

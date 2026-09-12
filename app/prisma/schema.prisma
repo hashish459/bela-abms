@@ -1510,6 +1510,10 @@ model InvoiceSetting {
   showDiscountColumn Boolean  @default(true)
   showBankDetails    Boolean  @default(true)
   showQrCode         Boolean  @default(true)
+  /// Which print layout (Settings › Printing Templates) Sales/Purchase Invoice detail
+  /// pages render with. Free string, not an enum, so a template can be added without a
+  /// migration — validated against TEMPLATE_OPTIONS in src/components/invoice-templates.
+  template           String   @default("CLASSIC")
   defaultTermsText   String?
   defaultNotes       String?
   updatedAt          DateTime @updatedAt

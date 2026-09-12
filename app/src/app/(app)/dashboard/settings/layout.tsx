@@ -16,6 +16,7 @@ const ALL_TABS: (SettingsTab & { perm: string })[] = [
   { title: "Bill Footer", href: "/dashboard/settings/bill-footer", perm: "settings.bill_footer" },
   { title: "Barcode", href: "/dashboard/settings/barcode", perm: "settings.barcode" },
   { title: "Invoice Setting", href: "/dashboard/settings/invoice-setting", perm: "settings.invoice_setting" },
+  { title: "Printing Templates", href: "/dashboard/settings/printing-templates", perm: "settings.printing_templates" },
   { title: "Invoice Import Setting", href: "/dashboard/settings/invoice-import-setting", perm: "settings.invoice_import_setting" },
   { title: "Backup Data", href: "/dashboard/settings/backup", perm: "settings.backup_data" },
   { title: "Signin & Security", href: "/dashboard/settings/signin-security", perm: "settings.signin_and_security" },

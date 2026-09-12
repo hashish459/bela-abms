@@ -13,6 +13,79 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 25 — 2026-09-12 (Printing Templates — 5 professionally designed invoice layouts)
+Client asked to clone the reference app's Settings › Printing Templates
+(`bela.nepalebilling.com/dashboard/settings/printing-templates`), explicitly framing the ask
+as design work ("act like a professional modern graphics designer and developer"), and
+offered to log into the reference app manually if needed. Browsed the live reference page
+directly (session already had an authenticated tab open) — it offers ~40 template variants
+per document type (A4 portrait/landscape, A5, 80mm/50mm thermal, POS, dual-copy, cargo/
+export with weight columns, boxed bill-book digit fields, colorful per-tenant branding). This
+was genuinely undiscovered territory: `Docs/DISCOVERY-LOG.md` had "Printing templates" on its
+own "not yet inspected" list, and — unlike session 24's 12 items — it had no seeded
+permission/menu entry in `prisma/seed.ts` at all; this feature didn't exist in this project's
+data model in any form before this session.
+
+**Deliberately built 5 distinct, professional templates instead of cloning the full ~40** —
+the reference's own catalogue is mostly minor layout variations on the same handful of ideas,
+and the client's framing asked for design judgment, not a literal 1:1 copy. Same
+"reinterpret rather than copy wholesale" principle as Budget (session 21): **Classic** (the
+app's pre-existing invoice layout, now one option among several), **Modern** (a genuinely
+new design — navy/orange brand-gradient header using Bela's actual brand colors from
+`globals.css`, tinted party-info box, shaded table header, a bold "GRAND TOTAL" callout
+band), **Compact** (dense A5 half-page layout), **Thermal Receipt** (narrow 80mm POS-style,
+dashed separators, monospace, centered), **Dual Copy** (Original + Customer Copy stacked on
+one A4 sheet with a scissor cut-line — the common Nepali carbon-copy filing practice
+observed directly in the reference gallery).
+
+**Architecture:** `InvoiceSetting` gained a `template` field (plain string, not an enum, so a
+6th template ships without a migration) and all 5 layouts live in
+`src/components/invoice-templates/` as self-contained components sharing one
+`InvoiceTemplateData` type — a superset covering both Sales and Purchase Invoice
+(`partyLabel`/`partyName` generic instead of hardcoding "customer" vs "supplier"), dispatched
+by `<InvoiceTemplateRenderer template=…>`. Both invoice detail-view components now map their
+own `doc` shape into this common type instead of rendering fixed JSX directly — Purchase's
+mapping explicitly hardcodes `showBankDetails`/`showQrCode` to `false` regardless of the real
+setting, carrying forward the pre-existing "Purchase never prints the company's own bank
+details" rule across every template rather than just the one layout that rule used to live
+in exclusively.
+
+**New, standard-but-previously-missing feature:** `src/lib/number-to-words.ts`
+(`amountInWords()`) — Indian/Nepali lakh/crore-grouped amount-in-words (e.g. "Rupees Twelve
+Lakh Thirty Four Thousand Five Hundred Sixty Seven and Fifty Paisa Only"), a standard line on
+every Nepali tax invoice that this app's print output never had. Verified against a battery
+of edge cases (zero, exact lakh/crore boundaries, teens/twenties, max value) by direct script
+execution before wiring it in. Every one of the 5 templates includes it.
+
+**Bug caught during live verification, not before:** the Settings gallery's sample invoice
+data used comma-formatted amounts for display ("12,260.50"); `amountInWords()` naively called
+`Number()` on that string, which parses to `NaN` → silently rendered "Rupees Zero Only" in
+the Modern template's live preview. Fixed by stripping thousand-separator commas before
+parsing. This would not have been caught by typecheck or lint — only live rendering exposed
+it, reconfirming the project's own "verify in the browser, not just the type checker"
+convention.
+
+The Settings page itself (new `settings.printing_templates` permission — added to
+`prisma/seed.ts`'s catalogue and menu tree, then the seed re-run idempotently against the
+existing dev DB) renders all 5 templates live at reduced scale against one shared realistic
+sample invoice (not static screenshots), so the gallery can never drift out of sync with what
+actually prints; a "Preview" button opens the same live render full-size in a modal.
+Selecting a template PUTs `/api/settings/printing-template` and applies immediately
+company-wide, matching the reference app's own instant-apply behavior.
+
+Verified live end-to-end: viewed the gallery with all 5 templates rendering correctly against
+real company data; selected Modern and confirmed a real Sales Invoice detail page switched to
+it immediately, including the correct amount-in-words and bank-details block; opened a real
+Purchase Invoice under the same Modern selection and confirmed it correctly renders as
+"PURCHASE INVOICE" / "SUPPLIER" / "Landed Amount" with bank details still suppressed;
+selected Thermal Receipt and confirmed a real invoice renders as a convincing narrow POS
+receipt; reset to Classic as the sensible shipped default. `npm run typecheck`, `npx eslint
+src` (clean on the first pass), and a clean `rm -rf .next && npm run build` all pass.
+
+Scoped to Sales + Purchase Invoice only — the reference app's own gallery has separate
+template sets per document type (e.g. Receipt has its own, much shorter list), which is out
+of scope for this pass.
+
 ### Session 24 — 2026-09-12 (Full menu audit + 12 stub menu items built)
 Client asked point-blank: "do all menu and sub menu is implemented all features?" Rather than
 answer from the session-by-session narrative in `Docs/PROGRESS.md`/memory (which only tracks

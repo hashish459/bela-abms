@@ -104,7 +104,7 @@ const PERMISSION_CATALOGUE: Array<{ key: string; name: string; modules: string[]
     modules: [
       "Signin & Security", "Company Info", "Backup Data", "Users", "Roles & Permissions",
       "Bill Footer", "Bank Detail", "Fiscal Year", "Custom Fields", "Banks", "Custom Status",
-      "Tax", "Barcode", "Invoice Setting", "Invoice Import Setting", "Tour",
+      "Tax", "Barcode", "Invoice Setting", "Printing Templates", "Invoice Import Setting", "Tour",
     ],
   },
   {
@@ -258,6 +258,7 @@ const MENU: MenuSeed[] = [
       { title: "Bank Detail", route: "/dashboard/settings/bank-detail", permissionKey: "settings.bank_detail" },
       { title: "Barcode", route: "/dashboard/settings/barcode", permissionKey: "settings.barcode" },
       { title: "Invoice Setting", route: "/dashboard/settings/invoice-setting", permissionKey: "settings.invoice_setting" },
+      { title: "Printing Templates", route: "/dashboard/settings/printing-templates", permissionKey: "settings.printing_templates" },
       { title: "Invoice Import Setting", route: "/dashboard/settings/invoice-import-setting", permissionKey: "settings.invoice_import_setting" },
       { title: "Custom Status", route: "/dashboard/settings/custom-status", permissionKey: "settings.custom_status" },
       { title: "Backup Data", route: "/dashboard/settings/backup", permissionKey: "settings.backup_data" },
