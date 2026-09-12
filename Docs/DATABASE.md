@@ -262,8 +262,29 @@ NO" / "PO / Contract No." labels, a bordered dimension-style totals box), **Stru
 (minimal architectural-plan look — heavy black rules, a bold black "TOTAL" band, boxed
 "Site Supervisor" / signatory blocks, no colour beyond black/white/grey). All 8 relabel the
 generic `referenceNo` field as "PO / Ref" or "PO / Contract No." where the industry framing
-calls for it, without any backend/data-model change. Scoped to Sales + Purchase Invoice only
-(the reference also has separate galleries per document type — e.g. Receipt — out of scope).
+calls for it, without any backend/data-model change. Scoped to Sales + Purchase Invoice at
+first (the reference also has separate galleries per document type — e.g. Receipt).
+
+**Session 27 — Receipt got its own print template + a detail page it never had.** Client
+asked to "add a receipt printing template too" — closing exactly the scope gap sessions 25/26
+flagged as out of scope. Receipts previously had *no* detail page or print capability at all
+(list + create-modal only, rows not even clickable); this session added
+`getReceipt()` (`src/server/sales/service.ts`) plus `/dashboard/sales/receipt/[id]`, making
+the list rows navigable for the first time. Deliberately a separate, smaller architecture from
+the invoice templates rather than shoehorned into `InvoiceTemplateData`: a payment receipt
+has no line-item table, so `ReceiptTemplateData`
+(`src/components/receipt-templates/types.ts`) is its own leaner shape, reusing only
+`TemplateCompany` from `invoice-templates` to avoid a duplicate definition. Shipped one
+template, **Classic** (mirrors the Classic invoice's letterhead pattern for visual
+consistency across every document this company prints — a boxed "Amount Received" callout,
+amount-in-words, a Payment mode/Deposited to/Against/Reference grid, "This is a
+computer-generated receipt." footer) — the same `RECEIPT_TEMPLATE_OPTIONS` +
+`<ReceiptTemplateRenderer>` dispatch pattern as invoices, so adding more receipt templates
+later needs no rearchitecting, same as how session 26 added 3 invoice templates onto
+session 25's shape with zero structural changes. No template *selector* UI yet since there's
+only one option — matches the project's own "don't build a picker for a choice that doesn't
+exist yet" convention; add the Settings-page gallery entry when a second receipt template is
+actually requested.
 
 Each template is a self-contained component in `src/components/invoice-templates/` sharing
 one `InvoiceTemplateData` type (a superset covering both invoice types — `partyLabel`/

@@ -480,6 +480,24 @@ export async function createReceipt(
   });
 }
 
+export async function getReceipt(companyId: string, id: string) {
+  const r = await db.receipt.findFirst({
+    where: { id, companyId },
+    include: {
+      fiscalYear: { select: { name: true } },
+      againstDoc: { select: { number: true } },
+    },
+  });
+  if (!r) throw errors.notFound("Receipt not found");
+
+  const [customer, paymentLedger] = await Promise.all([
+    db.ledger.findFirst({ where: { id: r.customerLedgerId }, select: { name: true, panNumber: true } }),
+    db.ledger.findFirst({ where: { id: r.paymentLedgerId }, select: { name: true } }),
+  ]);
+
+  return { ...r, customer, paymentLedger };
+}
+
 /* ───────────────────────────  Credit Note  ───────────────────────── */
 
 export async function createCreditNote(

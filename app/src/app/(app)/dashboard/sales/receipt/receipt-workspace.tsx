@@ -61,7 +61,11 @@ export function ReceiptWorkspace({
             </thead>
             <tbody className="divide-y divide-border">
               {receipts.map((r) => (
-                <tr key={r.id} className="hover:bg-accent-tint">
+                <tr
+                  key={r.id}
+                  onClick={() => router.push(`/dashboard/sales/receipt/${r.id}`)}
+                  className="cursor-pointer hover:bg-accent-tint"
+                >
                   <td className="px-4 py-2.5">{r.date}</td>
                   <td className="px-4 py-2.5 font-medium">{r.number}</td>
                   <td className="px-4 py-2.5">{r.against}</td>

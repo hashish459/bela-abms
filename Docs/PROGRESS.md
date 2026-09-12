@@ -13,6 +13,41 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 27 — 2026-09-12 (Receipt printing template — a document type that had none)
+Direct follow-on: "add a receipt printing template too." Unlike Sales/Purchase Invoice,
+Receipts had **no detail page or print capability at all** before this session — list rows
+weren't even clickable, just a plain create-modal workflow. Closed exactly the scope gap
+sessions 25/26 explicitly flagged as out of scope ("the reference also has separate galleries
+per document type — e.g. Receipt").
+
+Added `getReceipt(companyId, id)` (`src/server/sales/service.ts`, joins the customer/payment
+ledger names and the against-invoice number that `Receipt`'s three FK columns point at) and a
+new `/dashboard/sales/receipt/[id]` detail page — the first thing a user can navigate to from
+a Receipts list row, which now has a `cursor-pointer`/`onClick` like every other document list
+in the app instead of being inert.
+
+**Deliberately a separate, leaner architecture from the invoice templates, not shoehorned
+into `InvoiceTemplateData`.** A payment receipt has no line-item table, tax breakdown, or
+HS-code column — reusing the invoice shape would mean a dozen unused fields on every receipt.
+`ReceiptTemplateData` (`src/components/receipt-templates/types.ts`) is its own type, importing
+only `TemplateCompany` from `invoice-templates` rather than duplicating it. Shipped one
+template, **Classic**: the same letterhead pattern as the Classic invoice template (so every
+document this company prints shares a visual identity), a boxed "Amount Received" callout,
+`amountInWords()` reused from session 25, and a Payment mode / Deposited to / Against /
+Reference detail grid. Uses the same `RECEIPT_TEMPLATE_OPTIONS` + `<ReceiptTemplateRenderer>`
+dispatch shape as the invoice gallery (currently a single entry, `default` case), so a second
+receipt template later is exactly as additive as session 26's three were — but no Settings-
+page selector was built yet, since a picker with one option is exactly the kind of feature the
+project's own convention says not to build ("don't add validation/features for scenarios that
+can't happen") until a second template actually exists.
+
+Verified live: created a real receipt earlier in the project's history, clicked its row from
+the Receipts list for the first time ever, confirmed the detail page renders with correct
+company letterhead, party name, amount, amount-in-words, and against-invoice reference, and
+confirmed the Print button (the same shared `<PrintButton>` every other document uses) is
+present and wired. `npm run typecheck`, `npx eslint src` (clean on the first pass), and a
+clean `rm -rf .next && npm run build` all pass, including the new `[id]` dynamic route.
+
 ### Session 26 — 2026-09-12 (3 more Printing Templates — manufacturing/construction themed)
 Direct follow-on to session 25: client asked for "more modern predesigned templates for a
 manufacturing and construction company". The architecture built in session 25 made this a

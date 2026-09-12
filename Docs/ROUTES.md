@@ -91,7 +91,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/sales/invoice/[id]` | A · `sales.sales_invoice` read | Sales Invoice detail | renders via the selected Settings › Printing Templates layout (session 25); line items + totals + amount-in-words |
 | `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
-| `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
+| `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice); rows now click through to detail (session 27) |
+| `/dashboard/sales/receipt/[id]` | A · `sales.receipt` read | Receipt detail | printable payment receipt (session 27) — the app's first Receipt detail/print page, no dedicated API route (fetched server-side via `getReceipt()`) |
 | `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
 | `/dashboard/sales/proforma-invoice` | A · `sales.proforma_invoice` | Proforma Invoice | list + form + convert (session 24) — reuses `SalesDoc`/`<DraftWorkspace>` exactly like Quotation, no new model |
 | `/dashboard/sales/chalani` | A · `sales.chalani` | Chalani | dispatch/delivery register (session 24) — paperwork only, no GL/stock; optional link to a Sales Invoice |
