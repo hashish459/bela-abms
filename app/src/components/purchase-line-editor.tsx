@@ -17,6 +17,8 @@ export type PurchaseEditorLine = {
   exciseDuty: string;
   customDuty: string;
   taxRateId: string;
+  batchNo: string;
+  expiryDate: string;
 };
 
 export type PurchaseTotals = {
@@ -35,6 +37,7 @@ let keyc = 0;
 export const newPurchaseLine = (): PurchaseEditorLine => ({
   key: ++keyc, product: null, description: "", hsCode: "",
   qty: "1", rate: "", discount: "0", exciseDuty: "0", customDuty: "0", taxRateId: "",
+  batchNo: "", expiryDate: "",
 });
 
 export function PurchaseLineEditor({
@@ -143,6 +146,23 @@ export function PurchaseLineEditor({
                     placeholder="Description"
                     className="mt-1 w-full rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border"
                   />
+                  {l.product && (
+                    <div className="mt-1 flex gap-1">
+                      <input
+                        value={l.batchNo}
+                        onChange={(e) => patch(l.key, { batchNo: e.target.value })}
+                        placeholder="Batch no. (optional)"
+                        className="w-1/2 rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border"
+                      />
+                      <input
+                        type="date"
+                        value={l.expiryDate}
+                        onChange={(e) => patch(l.key, { expiryDate: e.target.value })}
+                        title="Expiry date"
+                        className="w-1/2 rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border"
+                      />
+                    </div>
+                  )}
                 </td>
                 <td className="px-2 py-1.5">
                   <input value={l.hsCode} onChange={(e) => patch(l.key, { hsCode: e.target.value })} className={inputClass} />

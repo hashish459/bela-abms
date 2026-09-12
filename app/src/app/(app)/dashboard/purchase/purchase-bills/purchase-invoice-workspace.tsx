@@ -146,6 +146,7 @@ function PurchaseInvoiceForm({
         qty: Number(l.qty), rate: Number(l.rate) || 0, discount: Number(l.discount) || 0,
         exciseDuty: Number(l.exciseDuty) || 0, customDuty: Number(l.customDuty) || 0,
         taxRateId: l.taxRateId || undefined, isNonTaxable: !l.taxRateId,
+        batchNo: l.batchNo || undefined, expiryDate: l.expiryDate || undefined,
       }));
     if (!supplierLedgerId) return toast("Select a supplier", "err");
     if (!supplierInvoiceNumber) return toast("Enter the supplier's invoice number", "err");

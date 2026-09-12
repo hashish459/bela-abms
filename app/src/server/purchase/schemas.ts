@@ -14,6 +14,8 @@ const docLine = z.object({
   customDuty: z.coerce.number().min(0).default(0),
   taxRateId: z.string().optional().or(z.literal("")),
   isNonTaxable: z.boolean().default(false),
+  batchNo: z.string().max(60).optional().or(z.literal("")),
+  expiryDate: isoDate.optional().or(z.literal("")),
 });
 
 const paymentMode = z.enum(["CREDIT", "CASH", "BANK", "CHEQUE", "WALLET"]);

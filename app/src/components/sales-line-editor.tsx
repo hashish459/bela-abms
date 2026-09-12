@@ -16,7 +16,10 @@ export type EditorLine = {
   rate: string;
   discount: string;
   taxRateId: string;
+  batchId: string;
 };
+
+type BatchOption = { id: string; batchNo: string; expiryDate: string | null; onHand: string };
 
 export type Totals = {
   subtotal: string;
@@ -31,7 +34,7 @@ export type Totals = {
 let keyc = 0;
 export const newLine = (): EditorLine => ({
   key: ++keyc, product: null, description: "", hsCode: "",
-  qty: "1", rate: "", discount: "0", taxRateId: "",
+  qty: "1", rate: "", discount: "0", taxRateId: "", batchId: "",
 });
 
 export function SalesLineEditor({
@@ -50,10 +53,31 @@ export function SalesLineEditor({
   onTotals: (t: Totals) => void;
 }) {
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [batchesByProduct, setBatchesByProduct] = useState<Record<string, BatchOption[]>>({});
   const defaultTaxId = taxRates.find((t) => !t.isNoTax)?.id ?? "";
 
   const patch = (key: number, p: Partial<EditorLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...p } : l)));
+
+  // Fetch batch options once per distinct product on the invoice — a product with no
+  // batches (or none in stock) just gets an empty list, and the picker doesn't render.
+  const productIds = [...new Set(lines.map((l) => l.product?.id).filter((id): id is string => !!id))].sort();
+  useEffect(() => {
+    const t = setTimeout(() => {
+      productIds
+        .filter((id) => !(id in batchesByProduct))
+        .forEach((id) => {
+          fetch(`/api/inventory/batches?productId=${id}`)
+            .then((r) => r.json())
+            .then((json) => {
+              if (json.ok) setBatchesByProduct((b) => ({ ...b, [id]: json.data.batches }));
+            })
+            .catch(() => void 0);
+        });
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productIds.join(",")]);
 
   // live totals preview via the same server engine
   useEffect(() => {
@@ -137,6 +161,20 @@ export function SalesLineEditor({
                     placeholder="Description"
                     className="mt-1 w-full rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border"
                   />
+                  {l.product && (batchesByProduct[l.product.id]?.length ?? 0) > 0 && (
+                    <select
+                      value={l.batchId}
+                      onChange={(e) => patch(l.key, { batchId: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-background px-2 py-1 text-xs outline-none ring-1 ring-border"
+                    >
+                      <option value="">Any batch</option>
+                      {batchesByProduct[l.product.id].map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.batchNo} · {b.onHand} on hand{b.expiryDate ? ` · exp ${b.expiryDate}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </td>
                 <td className="px-2 py-1.5">
                   <input value={l.hsCode} onChange={(e) => patch(l.key, { hsCode: e.target.value })} className={inputClass} />

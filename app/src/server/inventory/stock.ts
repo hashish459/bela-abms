@@ -176,6 +176,118 @@ export async function stockSummary(companyId: string, opts: { search?: string; c
   });
 }
 
+/** Find-or-create the batch a purchase receipt lands in. Unique on
+ * (companyId, productId, warehouseId, batchNo) — receiving the same batch
+ * number again (e.g. a second delivery of the same lot) reuses the row
+ * rather than duplicating it; a later expiryDate on the same call updates it. */
+export async function resolveOrCreateBatch(
+  tx: Tx,
+  args: { companyId: string; productId: string; warehouseId: string; batchNo: string; expiryDate?: Date | null },
+): Promise<string> {
+  const batch = await tx.productBatch.upsert({
+    where: {
+      companyId_productId_warehouseId_batchNo: {
+        companyId: args.companyId, productId: args.productId, warehouseId: args.warehouseId, batchNo: args.batchNo,
+      },
+    },
+    create: {
+      companyId: args.companyId, productId: args.productId, warehouseId: args.warehouseId,
+      batchNo: args.batchNo, expiryDate: args.expiryDate ?? null,
+    },
+    update: args.expiryDate ? { expiryDate: args.expiryDate } : {},
+    select: { id: true },
+  });
+  return batch.id;
+}
+
+/** Batches of a product with stock on hand in a warehouse, oldest expiry first (FEFO) —
+ * feeds the Sales line editor's batch picker. */
+export async function availableBatches(companyId: string, productId: string, warehouseId: string) {
+  const batches = await db.productBatch.findMany({
+    where: { companyId, productId, warehouseId },
+    orderBy: [{ expiryDate: "asc" }, { batchNo: "asc" }],
+  });
+  if (!batches.length) return [];
+
+  const movements = await db.stockMovement.groupBy({
+    by: ["batchId"],
+    where: { companyId, productId, warehouseId, batchId: { in: batches.map((b) => b.id) } },
+    _sum: { qty: true },
+  });
+  const qtyByBatch = new Map(movements.map((m) => [m.batchId, D(m._sum.qty ?? 0)]));
+
+  return batches
+    .map((b) => ({
+      id: b.id,
+      batchNo: b.batchNo,
+      expiryDate: b.expiryDate ? b.expiryDate.toISOString().slice(0, 10) : null,
+      onHand: (qtyByBatch.get(b.id) ?? D(0)).toFixed(3),
+    }))
+    .filter((b) => Number(b.onHand) > 0);
+}
+
+/** Batch Wise Stock Summary — on-hand quantity per product/warehouse/batch lot. */
+export async function batchWiseStockSummary(companyId: string, opts: { search?: string } = {}) {
+  const batches = await db.productBatch.findMany({
+    where: {
+      companyId,
+      ...(opts.search
+        ? {
+            OR: [
+              { batchNo: { contains: opts.search, mode: "insensitive" } },
+              { product: { name: { contains: opts.search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ product: { name: "asc" } }, { batchNo: "asc" }],
+    select: {
+      id: true, batchNo: true, expiryDate: true,
+      product: { select: { id: true, name: true, sku: true, unit: { select: { shortName: true } } } },
+      warehouse: { select: { name: true } },
+    },
+  });
+  if (!batches.length) return [];
+
+  const movements = await db.stockMovement.groupBy({
+    by: ["batchId"],
+    where: { companyId, batchId: { in: batches.map((b) => b.id) } },
+    _sum: { qty: true },
+  });
+  const qtyByBatch = new Map(movements.map((m) => [m.batchId, D(m._sum.qty ?? 0)]));
+
+  return batches.map((b) => ({
+    batchId: b.id,
+    productName: b.product.name,
+    sku: b.product.sku,
+    unit: b.product.unit.shortName,
+    warehouse: b.warehouse.name,
+    batchNo: b.batchNo,
+    expiryDate: b.expiryDate ? b.expiryDate.toISOString().slice(0, 10) : null,
+    onHand: (qtyByBatch.get(b.id) ?? D(0)).toFixed(3),
+  }));
+}
+
+/** Expiry Management ("Near Expiry Report") — batches with stock on hand, bucketed by how
+ * close their expiry is. `withinDays` controls the NEAR_EXPIRY cutoff (default 90). */
+export async function expiryManagement(companyId: string, opts: { withinDays?: number } = {}) {
+  const withinDays = opts.withinDays ?? 90;
+  const rows = await batchWiseStockSummary(companyId);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return rows
+    .filter((r) => r.expiryDate && Number(r.onHand) > 0)
+    .map((r) => {
+      const expiry = new Date(r.expiryDate!);
+      const daysToExpiry = Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
+      const status = daysToExpiry < 0 ? "EXPIRED" : daysToExpiry <= withinDays ? "NEAR_EXPIRY" : "OK";
+      return { ...r, daysToExpiry, status };
+    })
+    .filter((r) => r.status !== "OK")
+    .sort((a, b) => a.daysToExpiry - b.daysToExpiry);
+}
+
 /** Per-warehouse breakdown for one product. */
 export async function stockByWarehouse(companyId: string, productId: string) {
   const rows = await db.stockMovement.groupBy({

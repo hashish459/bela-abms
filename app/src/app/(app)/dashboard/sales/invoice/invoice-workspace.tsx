@@ -171,6 +171,7 @@ function InvoiceForm({
         discount: Number(l.discount) || 0,
         taxRateId: l.taxRateId || undefined,
         isNonTaxable: !l.taxRateId,
+        batchId: l.batchId || undefined,
       }));
     if (payloadLines.length === 0) return toast("Add at least one line item", "err");
     if (paymentMode === "CREDIT" && !customerLedgerId)

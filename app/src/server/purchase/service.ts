@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { postVoucher, nextNumber, formatVoucherNumber } from "@/server/accounts/gl";
-import { postStockMovement } from "@/server/inventory/stock";
+import { postStockMovement, resolveOrCreateBatch } from "@/server/inventory/stock";
 import { calcPurchaseTotals, type PurchaseCalcLineInput } from "./calc";
 import type {
   DebitNoteCreate,
@@ -178,6 +178,24 @@ export async function createPurchaseInvoice(
       where: { companyId, deletedAt: null }, orderBy: { isDefault: "desc" }, select: { id: true },
     });
 
+    // Batch is optional per line: only GOODS lines with a batch number typed in get one.
+    // Resolved up front (find-or-create) since Prisma's nested `items.create` below can't
+    // itself run async lookups per row.
+    const batchIds: (string | null)[] = await Promise.all(
+      input.lines.map(async (l, i) => {
+        const batchNo = orNull(l.batchNo);
+        const warehouseId = orNull(l.warehouseId) ?? defaultWh?.id;
+        if (!batchNo || !warehouseId || calcLines[i].productKind !== "GOODS" || !orNull(l.productId)) return null;
+        return resolveOrCreateBatch(tx, {
+          companyId,
+          productId: l.productId!,
+          warehouseId,
+          batchNo,
+          expiryDate: l.expiryDate ? new Date(l.expiryDate) : null,
+        });
+      }),
+    );
+
     const notCredit = input.paymentMode !== "CREDIT";
     const paymentLedgerId = notCredit ? orNull(input.paymentLedgerId)! : null;
 
@@ -220,6 +238,7 @@ export async function createPurchaseInvoice(
             landedAmount: D(totals.lines[i].capitalizedAmount),
             landedUnitCost: D(totals.lines[i].landedUnitCost),
             lineVat: D(totals.lines[i].lineVat),
+            batchId: batchIds[i],
             order: i,
           })),
         },

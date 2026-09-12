@@ -83,6 +83,36 @@ async function buildCalcLines(
   });
 }
 
+/** Sales depletes an EXISTING batch (never creates one) — the line editor's
+ * picker only ever offers batches with stock on hand, but this re-validates
+ * server-side that each chosen batch actually belongs to its line's product
+ * + warehouse + company before it's trusted for a stock-out. */
+async function resolveLineBatchIds(
+  tx: Tx,
+  companyId: string,
+  lines: { productId?: string; warehouseId?: string; batchId?: string }[],
+  defaultWarehouseId?: string,
+): Promise<(string | null)[]> {
+  const ids = [...new Set(lines.map((l) => orNull(l.batchId)).filter(Boolean) as string[])];
+  if (!ids.length) return lines.map(() => null);
+
+  const batches = await tx.productBatch.findMany({
+    where: { id: { in: ids }, companyId },
+    select: { id: true, productId: true, warehouseId: true },
+  });
+  const byId = new Map(batches.map((b) => [b.id, b]));
+
+  return lines.map((l) => {
+    const batchId = orNull(l.batchId);
+    if (!batchId) return null;
+    const batch = byId.get(batchId);
+    const warehouseId = orNull(l.warehouseId) ?? defaultWarehouseId;
+    if (!batch || batch.productId !== orNull(l.productId) || batch.warehouseId !== warehouseId)
+      throw errors.validation(null, "Selected batch does not match this line's product/warehouse");
+    return batchId;
+  });
+}
+
 /* ───────────────────────  Quotation / Sales Order (drafts)  ────────── */
 
 export async function createDraft(
@@ -196,6 +226,8 @@ export async function createInvoice(
       select: { id: true },
     });
 
+    const batchIds = await resolveLineBatchIds(tx, companyId, input.lines, defaultWh?.id);
+
     const notCredit = input.paymentMode !== "CREDIT";
     const paymentLedgerId = notCredit ? orNull(input.paymentLedgerId)! : null;
 
@@ -242,6 +274,7 @@ export async function createInvoice(
             grossAmount: D(totals.lines[i].grossAmount),
             netAmount: D(totals.lines[i].netAmount),
             lineVat: D(totals.lines[i].lineVat),
+            batchId: batchIds[i],
             order: i,
           })),
         },

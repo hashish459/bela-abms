@@ -76,8 +76,8 @@ export default async function ReportsPage() {
       perm: "reports.inventory_reports",
       reports: [
         { title: "Stock Summary", href: "/dashboard/reports/inventory/stock-summary" },
-        { title: "Batch Wise Stock Summary", href: null, gapReason: "Needs a Batch model (mfg/expiry date tracking) — not yet in the schema" },
-        { title: "Expiry Management", href: null, gapReason: "Needs a Batch model (mfg/expiry date tracking) — not yet in the schema" },
+        { title: "Batch Wise Stock Summary", href: "/dashboard/reports/inventory/batch-wise-stock-summary" },
+        { title: "Expiry Management", href: "/dashboard/reports/inventory/expiry-management" },
       ],
     },
     {

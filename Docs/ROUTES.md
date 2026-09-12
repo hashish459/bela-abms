@@ -74,6 +74,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
 | `/dashboard/reports/inventory/stock-summary` | A · `reports.inventory_reports` | Stock Summary | on-hand, low-stock flag |
+| `/dashboard/reports/inventory/batch-wise-stock-summary` | A · `reports.inventory_reports` | Batch Wise Stock Summary | on-hand per batch/lot; populated once a Purchase Invoice line records a batch number |
+| `/dashboard/reports/inventory/expiry-management` | A · `reports.inventory_reports` | Expiry Management | batches with stock on hand that are expired or expiring within 90 days |
 | `/dashboard/sales/invoice` | A · `sales.sales_invoice` | Sales Invoice | list + form (immutability notice); rows click through to detail |
 | `/dashboard/sales/invoice/[id]` | A · `sales.sales_invoice` read | Sales Invoice detail | printable letterhead + line items + totals |
 | `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
@@ -146,6 +148,9 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
 | GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
 | GET | `/api/reports/stock-summary` | A · `reports.inventory_reports` read | on-hand per product (Σ movements) |
+| GET | `/api/reports/batch-wise-stock-summary` | A · `reports.inventory_reports` read | `?search`; on-hand per batch/lot |
+| GET | `/api/reports/expiry-management` | A · `reports.inventory_reports` read | `?withinDays` (default 90); expired/near-expiry batches with stock |
+| GET | `/api/inventory/batches` | A · `inventory.product_item` read | `?productId&warehouseId` (warehouse defaults to the company's default); feeds the Sales line editor's batch picker, FEFO-sorted |
 | POST | `/api/sales/calc` | A · `sales.sales_invoice` read | preview totals (same engine as the write) |
 | GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **immutable, no PATCH/DELETE**) |
 | GET | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read | invoice detail with items + receipts |

@@ -13,6 +13,58 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 20 — 2026-09-12 (Batch/expiry tracking — closing the Reports catalogue gaps)
+Client asked to "continue remaining tasks... enterprise level... today's company standards"
+with no specific list, so this session worked from the two honestly-flagged gaps left in the
+Reports catalogue (session 18): Batch Wise Stock Summary and Expiry Management, both
+previously marked "needs a Batch model — not yet in the schema". That turned out to be
+**wrong** on closer inspection — `ProductBatch` (with `expiryDate`) has existed since session
+6, `StockMovement.batchId` and `SalesDocItem.batchId`/`PurchaseDocItem.batchId` were already
+columns, and `postStockMovement()`/`onHandQty()` in `src/server/inventory/stock.ts` already
+took an optional `batchId` end-to-end. The gap was real but narrower than stated: nothing
+ever *created* a `ProductBatch` row or exposed batch fields in the UI — the plumbing was
+provisioned but never wired to a form. Corrected and closed it properly rather than leaving
+the gap-card up.
+
+**What was built:**
+- `resolveOrCreateBatch()` (find-or-create, unique on companyId+productId+warehouseId+batchNo)
+  and `availableBatches()` (FEFO-sorted, stock-on-hand > 0 only) added to
+  `src/server/inventory/stock.ts`.
+- **Purchase Invoice line editor**: optional "Batch no." + expiry date inputs appear once a
+  product is picked. `docLine` schema (`purchase/schemas.ts`) gained `batchNo`/`expiryDate`;
+  `createInvoice()` resolves/creates the batch against the line's (or default) warehouse
+  *before* the transaction's `items.create`, since Prisma's nested create can't run async
+  lookups per row.
+- **Sales Invoice line editor**: once a product is picked, `GET /api/inventory/batches`
+  fetches its available batches (against the default warehouse) and an optional "Any batch"
+  dropdown appears, showing on-hand qty and expiry per lot. `createInvoice()` re-validates
+  server-side that the chosen `batchId` actually belongs to that product+warehouse+company
+  before trusting it for the stock-out (`resolveLineBatchIds()`), rejecting anything else.
+- **Reports**: `batchWiseStockSummary()` (per-lot on-hand) and `expiryManagement()` (batches
+  with stock that are expired or within 90 days of expiry, soonest first) — new functions in
+  `stock.ts`, new API routes, new report pages. The Reports catalogue's two gap-cards for
+  these now link to real pages instead of showing a reason.
+- Deliberately did **not** touch costing: batch is recorded as a tag on the `StockMovement`
+  row for traceability/expiry reporting only — COGS still reads the existing product-level
+  weighted-average cost, unchanged. Also did not touch Credit Note/Debit Note (returns don't
+  select a batch to restock into) or add per-line warehouse selection (still resolves to the
+  company's one default warehouse everywhere, matching how the rest of the app already
+  works) — both noted as intentional scope boundaries, not oversights.
+
+Verified live end-to-end, not just typechecked: created a real Purchase Invoice with batch
+"LOT-2026-A" (expiry 2026-12-31) for Steel Bracket, confirmed it appeared in Batch Wise
+Stock Summary at the exact quantity purchased; confirmed it correctly did NOT appear in
+Expiry Management (>90 days out); created a Sales Invoice, confirmed the batch picker
+offered exactly that lot with its live on-hand and expiry; sold part of it and confirmed
+Batch Wise Stock Summary's on-hand dropped by exactly the sold quantity. `npm run
+typecheck`, `npx eslint src`, and a clean `rm -rf .next && npm run build` all pass.
+
+Still-open documented gaps (unchanged from session 18/19, still deliberately not built):
+Annex 13/5 (no official IRD spec), Budget module + Budget vs Expense Report (module doesn't
+exist), Custom Fields/Custom Status dynamic wiring into entry forms, Barcode symbol
+rendering, Invoice Import Setting's CSV upload/parse execution. These are reasonable
+candidates for a following session under the same "continue remaining tasks" instruction.
+
 ### Session 19 — 2026-09-12 (The 12 remaining Settings sub-pages)
 Closed out the client's oldest still-open ask (first raised in session 17, deferred behind
 the letterhead/logo work and then the Reports catalogue): every Settings sub-page beyond
