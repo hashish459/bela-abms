@@ -155,7 +155,7 @@ export const invoiceSettingUpdate = z.object({
 });
 
 export const printingTemplateUpdate = z.object({
-  template: z.enum(["CLASSIC", "MODERN", "COMPACT", "THERMAL", "DUAL_COPY"]),
+  template: z.enum(["CLASSIC", "MODERN", "COMPACT", "THERMAL", "DUAL_COPY", "INDUSTRIAL", "BLUEPRINT", "CONCRETE"]),
 });
 
 /* ─────────────────────────  Invoice import template  ────────────────────── */

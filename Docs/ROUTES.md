@@ -18,7 +18,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/bank-detail` | A · `settings.bank_detail` | Bank Detail | company's own bank accounts; default one feeds Bill Footer |
 | `/dashboard/settings/bill-footer` | A · `settings.bill_footer` | Bill Footer | terms, bank account, signatory, note — printed on Sales/Purchase invoice detail+print pages |
 | `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
-| `/dashboard/settings/printing-templates` | A · `settings.printing_templates` | Printing Templates | gallery of 5 live-rendered print layouts for Sales/Purchase Invoice (session 25) — new permission module, not previously seeded |
+| `/dashboard/settings/printing-templates` | A · `settings.printing_templates` | Printing Templates | gallery of 8 live-rendered print layouts for Sales/Purchase Invoice (session 25, +3 manufacturing/construction-themed in session 26) — new permission module, not previously seeded |
 | `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module — active fields render dynamically on that module's entry form (session 22) |
 | `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
 | `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config; both CODE128 and EAN13 (session 22) render for real |

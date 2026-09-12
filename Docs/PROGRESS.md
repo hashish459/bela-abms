@@ -13,6 +13,45 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 26 — 2026-09-12 (3 more Printing Templates — manufacturing/construction themed)
+Direct follow-on to session 25: client asked for "more modern predesigned templates for a
+manufacturing and construction company". The architecture built in session 25 made this a
+clean additive change — no schema migration, no Settings-page changes, no API-route changes,
+no changes to either invoice detail view. Just: append 3 entries to `TEMPLATE_OPTIONS`, add 3
+new self-contained components, add 3 `case`s to `<InvoiceTemplateRenderer>`'s switch, and
+widen the `template` Zod enum in `src/server/settings/schemas.ts`. Confirms the session-25
+design goal held up on first real reuse.
+
+**Industrial** — charcoal (`#1f2328`) and safety-yellow (`#f5c518`) hazard-stripe header
+(a repeating 45° CSS gradient, the classic yellow/black tape pattern), a "Site / Job Notes"
+callout box for the invoice's free-text notes, "Received by (site)" on the signature line
+instead of a generic "Prepared by" — built for a factory floor or site office rather than a
+retail counter.
+
+**Blueprint** — pale engineering-grid-paper background (a two-axis CSS `linear-gradient`
+grid, 16px cells), small L-shaped corner registration marks on the header and totals boxes
+(mimicking a drawing sheet's crop marks), monospace ink-blue typography throughout, "DWG NO"
+in place of "Invoice No", "PO / Contract No." in place of the generic reference label, and a
+dimension-style bordered totals box — for a construction or engineering shop whose own
+drawings already use this register.
+
+**Structural** — deliberately the most restrained of the three: pure black/white/grey, no
+accent colour at all, a solid black header band and a matching black "TOTAL" band, boxed
+"Site Supervisor" and signatory blocks styled like an architectural title block. The
+counterpoint to Industrial's high-contrast yellow — for a client who wants "professional
+and minimal," not "loud."
+
+All three relabel `referenceNo` as "PO / Ref" or "PO / Contract No." (a real construction-
+industry convention — a PO or contract number is usually the primary cross-reference on this
+kind of invoice) without any backend change; the field itself was already generic.
+
+Verified live: all 8 templates (5 from session 25 + 3 new) render correctly in the Settings
+gallery against real company data; previewed each of the 3 new ones full-size in the modal;
+selected Industrial and confirmed a real Sales Invoice detail page switched to it correctly
+with real data; reset to Classic as the shipped default afterward. `npm run typecheck`,
+`npx eslint src` (clean on the first pass), and a clean `rm -rf .next && npm run build` all
+pass.
+
 ### Session 25 — 2026-09-12 (Printing Templates — 5 professionally designed invoice layouts)
 Client asked to clone the reference app's Settings › Printing Templates
 (`bela.nepalebilling.com/dashboard/settings/printing-templates`), explicitly framing the ask

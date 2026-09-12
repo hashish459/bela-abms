@@ -74,6 +74,9 @@ export const TEMPLATE_OPTIONS = [
   { id: "COMPACT", label: "Compact", size: "A5 Portrait", description: "Half-page layout for A5 paper or shorter invoices." },
   { id: "THERMAL", label: "Thermal Receipt", size: "80mm", description: "Narrow receipt-printer layout for POS counters." },
   { id: "DUAL_COPY", label: "Dual Copy", size: "A4 Portrait", description: "Original + Customer Copy stacked on one A4 sheet." },
+  { id: "INDUSTRIAL", label: "Industrial", size: "A4 Portrait", description: "Steel-grey and safety-yellow — built for a factory floor or site office." },
+  { id: "BLUEPRINT", label: "Blueprint", size: "A4 Portrait", description: "Technical-drawing styling — grid paper, corner marks, dimension-style totals." },
+  { id: "CONCRETE", label: "Structural", size: "A4 Portrait", description: "Minimal architectural-plan look — heavy rules, high-contrast blocks." },
 ] as const;
 
 export type TemplateId = (typeof TEMPLATE_OPTIONS)[number]["id"];

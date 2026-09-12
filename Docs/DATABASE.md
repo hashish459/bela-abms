@@ -241,20 +241,29 @@ toggling "Show HS Code column" off in Settings immediately changes what prints o
 invoice. Purchase invoices intentionally never print the company's own bank details (a
 payable, not a receivable) even though the setting is shared.
 
-### Printing Templates — ✅ BUILT (session 25)
+### Printing Templates — ✅ BUILT (session 25, extended session 26)
 Client asked to clone the reference app's Settings › Printing Templates gallery
 (`bela.nepalebilling.com/dashboard/settings/printing-templates`), which offers ~40 near-
-duplicate layout variations per document type. Deliberately built 5 genuinely distinct,
-professionally designed templates instead of cloning the full count — quality/variety over
-quantity, the same "reinterpret rather than copy wholesale" judgment call as Budget
-(session 21): **Classic** (the pre-existing layout, now one option among several rather than
-the only one), **Modern** (navy/orange brand-gradient header, shaded table, a bold "GRAND
-TOTAL" callout band — uses the real brand colors from `globals.css`, not generic ones),
-**Compact** (dense single-page A5 layout), **Thermal Receipt** (narrow 80mm POS-style,
-dashed separators, monospace), **Dual Copy** (Original + Customer Copy stacked on one A4
-sheet with a cut-line, the common Nepali carbon-copy business practice observed in the
-reference gallery). Scoped to Sales + Purchase Invoice only (the reference also has separate
-galleries per document type — e.g. Receipt — which is out of scope here).
+duplicate layout variations per document type. Deliberately built distinct, professionally
+designed templates instead of cloning the full count — quality/variety over quantity, the
+same "reinterpret rather than copy wholesale" judgment call as Budget (session 21). Session
+25 shipped 5 general-purpose layouts: **Classic** (the pre-existing layout, now one option
+among several rather than the only one), **Modern** (navy/orange brand-gradient header,
+shaded table, a bold "GRAND TOTAL" callout band — uses the real brand colors from
+`globals.css`, not generic ones), **Compact** (dense single-page A5 layout), **Thermal
+Receipt** (narrow 80mm POS-style, dashed separators, monospace), **Dual Copy** (Original +
+Customer Copy stacked on one A4 sheet with a cut-line, the common Nepali carbon-copy business
+practice observed in the reference gallery). Session 26 added 3 more aimed specifically at a
+manufacturing/construction business (the client explicitly asked for this industry framing):
+**Industrial** (charcoal + safety-yellow hazard-stripe header, a "Site / Job Notes" callout,
+"Received by (site)" signature line — factory-floor styling), **Blueprint** (pale grid-paper
+background, corner registration marks, monospace ink-blue technical-drawing typography, "DWG
+NO" / "PO / Contract No." labels, a bordered dimension-style totals box), **Structural**
+(minimal architectural-plan look — heavy black rules, a bold black "TOTAL" band, boxed
+"Site Supervisor" / signatory blocks, no colour beyond black/white/grey). All 8 relabel the
+generic `referenceNo` field as "PO / Ref" or "PO / Contract No." where the industry framing
+calls for it, without any backend/data-model change. Scoped to Sales + Purchase Invoice only
+(the reference also has separate galleries per document type — e.g. Receipt — out of scope).
 
 Each template is a self-contained component in `src/components/invoice-templates/` sharing
 one `InvoiceTemplateData` type (a superset covering both invoice types — `partyLabel`/
@@ -276,12 +285,17 @@ data used comma-formatted amounts, which silently parsed to `NaN`→0 before the
 The Settings page itself (`/dashboard/settings/printing-templates`, new permission
 `settings.printing_templates` — unlike session 24's 12 items, this page didn't exist in the
 seed data at all and needed a fresh `PermissionModule`/`MenuItem` pair added to
-`prisma/seed.ts`) renders all 5 templates live at reduced scale (`transform: scale()`, not a
+`prisma/seed.ts`) renders every template live at reduced scale (`transform: scale()`, not a
 static screenshot) against one shared realistic sample invoice, so the gallery always reflects
 the current code — a thumbnail can never drift out of sync with what actually prints. A
 "Preview" button opens the same live render full-size in a modal. Selecting a template PUTs
 `/api/settings/printing-template` and applies immediately company-wide, exactly like the
-reference app's own instant-apply behavior (no separate publish/save step).
+reference app's own instant-apply behavior (no separate publish/save step). Adding a template
+is additive-only: append to `TEMPLATE_OPTIONS` in `src/components/invoice-templates/types.ts`,
+add its component and a `case` in `<InvoiceTemplateRenderer>`, and widen the `template` enum
+in `src/server/settings/schemas.ts` — the gallery, detail pages, and API all pick it up with
+no other changes, which is how session 26 added 3 templates without touching the Settings
+page, the invoice detail views, or the API route at all.
 
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·
