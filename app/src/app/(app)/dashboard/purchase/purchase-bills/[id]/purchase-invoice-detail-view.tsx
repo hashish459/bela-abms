@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { PrintButton } from "@/components/print-button";
 import { PrintLetterhead } from "@/components/print-letterhead";
+import { PrintBillFooter } from "@/components/print-bill-footer";
 import { adToBs } from "@/lib/bs-date";
 
 type Item = {
@@ -27,12 +28,16 @@ type Company = {
   registeredAddress: string; registeredAddress2: string | null;
   phone: string; phone2: string | null; email: string; panNumber: string;
 } | null;
+type InvoiceSetting = { showHsCode: boolean; showDiscountColumn: boolean };
+type BillFooter = { termsAndConditions: string | null; authorizedSignatory: string | null; footerNote: string | null } | null;
 
 const DOC_LABEL: Record<string, string> = {
   INVOICE: "Purchase Invoice", PURCHASE_ORDER: "Purchase Order", DEBIT_NOTE: "Debit Note",
 };
 
-export function PurchaseInvoiceDetailView({ doc, company }: { doc: Doc; company: Company }) {
+export function PurchaseInvoiceDetailView({
+  doc, company, invoiceSetting, billFooter,
+}: { doc: Doc; company: Company; invoiceSetting: InvoiceSetting; billFooter: BillFooter }) {
   return (
     <>
       <PageHeader
@@ -85,10 +90,10 @@ export function PurchaseInvoiceDetailView({ doc, company }: { doc: Doc; company:
           <thead className="border-b border-border text-left text-xs text-muted">
             <tr>
               <th className="py-2 font-medium">Description</th>
-              <th className="py-2 font-medium">HS Code</th>
+              {invoiceSetting.showHsCode && <th className="py-2 font-medium">HS Code</th>}
               <th className="py-2 text-right font-medium">Qty</th>
               <th className="py-2 text-right font-medium">Rate</th>
-              <th className="py-2 text-right font-medium">Discount</th>
+              {invoiceSetting.showDiscountColumn && <th className="py-2 text-right font-medium">Discount</th>}
               <th className="py-2 text-right font-medium">VAT %</th>
               <th className="py-2 text-right font-medium">Landed Amount</th>
             </tr>
@@ -97,10 +102,10 @@ export function PurchaseInvoiceDetailView({ doc, company }: { doc: Doc; company:
             {doc.items.map((it) => (
               <tr key={it.id}>
                 <td className="py-2">{it.description}</td>
-                <td className="py-2 text-xs text-muted">{it.hsCode ?? "—"}</td>
+                {invoiceSetting.showHsCode && <td className="py-2 text-xs text-muted">{it.hsCode ?? "—"}</td>}
                 <td className="py-2 text-right tabular-nums">{it.qty}</td>
                 <td className="py-2 text-right tabular-nums">{it.rate}</td>
-                <td className="py-2 text-right tabular-nums">{it.discount}</td>
+                {invoiceSetting.showDiscountColumn && <td className="py-2 text-right tabular-nums">{it.discount}</td>}
                 <td className="py-2 text-right tabular-nums">{it.taxRatePct}</td>
                 <td className="py-2 text-right tabular-nums font-medium">{it.landedAmount}</td>
               </tr>
@@ -155,14 +160,17 @@ export function PurchaseInvoiceDetailView({ doc, company }: { doc: Doc; company:
           </table>
         </div>
 
-        {doc.notes && (
-          <p className="mt-4 border-t border-border pt-3 text-xs text-muted">{doc.notes}</p>
-        )}
+        {doc.notes && <p className="mt-4 text-xs text-muted">{doc.notes}</p>}
 
-        <div className="mt-16 flex justify-between text-xs text-muted">
-          <div>Prepared by</div>
-          <div>Authorized signature</div>
-        </div>
+        <PrintBillFooter
+          terms={billFooter?.termsAndConditions ?? null}
+          authorizedSignatory={billFooter?.authorizedSignatory ?? null}
+          footerNote={billFooter?.footerNote ?? null}
+          bankAccount={null}
+          showBankDetails={false}
+          qrUrl={null}
+          showQrCode={false}
+        />
       </Card>
     </>
   );

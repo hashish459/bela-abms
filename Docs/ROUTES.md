@@ -13,6 +13,18 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/company-info` | A · `settings.company_info` | Company Info | legal identity + IRD/CBMS fields (stubbed) |
 | `/dashboard/settings/fiscal-year` | A · `settings.fiscal_year` | Fiscal Year | BS label + AD dates, active flag |
 | `/dashboard/settings/tax` | A · `settings.tax` | Tax | rate list; system rows locked |
+| `/dashboard/settings/users` | A · `settings.users` | User & Permissions | 3 tabs: Users (CRUD + role assignment), Roles & Permissions (`settings.roles_and_permissions` — full CRUD permission-matrix editor over all `PermissionModule` rows, "Grant all"/"Clear" per group), Companies (Branch CRUD) |
+| `/dashboard/settings/banks` | A · `settings.banks` | Banks | master bank-name list |
+| `/dashboard/settings/bank-detail` | A · `settings.bank_detail` | Bank Detail | company's own bank accounts; default one feeds Bill Footer |
+| `/dashboard/settings/bill-footer` | A · `settings.bill_footer` | Bill Footer | terms, bank account, signatory, note — printed on Sales/Purchase invoice detail+print pages |
+| `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
+| `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module (MVP — not yet rendered into entry forms) |
+| `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
+| `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config (no renderer wired yet) |
+| `/dashboard/settings/invoice-import-setting` | A · `settings.invoice_import_setting` | Invoice Import Setting | CSV column-mapping templates (MVP — upload/parse pipeline is a follow-on) |
+| `/dashboard/settings/backup` | A · `settings.backup_data` | Backup Data | on-demand full JSON export of company data |
+| `/dashboard/settings/signin-security` | A · `settings.signin_and_security` | Signin & Security | change password (self-service, no permission gate) + active `RefreshToken` sessions with revoke |
+| `/dashboard/settings/tour` | A · `settings.tour` | Tour | static first-time-setup checklist linking into the app |
 | `/dashboard/settings/*` (other) | A | wrapped by `settings/layout.tsx` sub-nav | fall through to stub until built |
 | `/dashboard/accounts/charts-of-accounts` | A · `accounts.charts_of_accounts` | Chart of Accounts | collapsible AS/LI/EQ/IN/EX tree + Add Account |
 | `/dashboard/accounts/contacts` | A · `accounts.contacts` | Contacts | Customers / Suppliers tabs + contact form |
@@ -89,6 +101,30 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/settings/tax-rates` | A · `settings.tax` view/create | list / create tax rate |
 | PATCH/DELETE | `/api/settings/tax-rates/[id]` | A · `settings.tax` update/delete | edit / soft-delete (system rows locked) |
 | GET/PUT | `/api/settings/company-info` | A · `settings.company_info` view/update | company profile; CBMS password encrypted, never returned |
+| POST | `/api/settings/signin-security/change-password` | A (self, no permission gate) | own password change; CSRF-checked via `assertCsrf()` since it bypasses `guard()` |
+| GET | `/api/settings/signin-security/sessions` | A (self) | own active `RefreshToken` rows, capped at 15 |
+| DELETE | `/api/settings/signin-security/sessions/[id]` | A (self) | revoke one of own sessions |
+| GET/POST | `/api/settings/users` | A · `settings.users` view/create | list / create user (+ `UserCompany` link + `UserRole` links) |
+| PATCH | `/api/settings/users/[id]` | A · `settings.users` update | edit profile/status/roles; blocks self-disable and disabling the last active admin |
+| GET | `/api/settings/permission-modules` | A · `settings.roles_and_permissions` view | the full `PermissionModule` catalogue, grouped |
+| GET/POST | `/api/settings/roles` | A · `settings.roles_and_permissions` view/create | list / create role + its `RolePermission` matrix |
+| PATCH/DELETE | `/api/settings/roles/[id]` | A · `settings.roles_and_permissions` update/delete | edit name/matrix; delete blocked for system roles or roles with assigned users |
+| GET/POST | `/api/settings/branches` | A · `settings.users` view/create | Companies tab — Branch CRUD |
+| DELETE | `/api/settings/branches/[id]` | A · `settings.users` delete | soft-delete a branch |
+| GET/POST | `/api/settings/banks` | A · `settings.banks` view/create | master bank-name list |
+| PATCH/DELETE | `/api/settings/banks/[id]` | A · `settings.banks` update/delete | delete blocked while it has bank accounts |
+| GET/POST | `/api/settings/bank-accounts` | A · `settings.bank_detail` view/create | the company's own registered accounts |
+| PATCH/DELETE | `/api/settings/bank-accounts/[id]` | A · `settings.bank_detail` update/delete | setting `isDefault` clears it on all others |
+| GET/POST | `/api/settings/custom-fields` | A · `settings.custom_fields` view/create | UDF definitions |
+| PATCH/DELETE | `/api/settings/custom-fields/[id]` | A · `settings.custom_fields` update/delete | |
+| GET/POST | `/api/settings/custom-status` | A · `settings.custom_status` view/create | descriptive per-module status labels |
+| PATCH/DELETE | `/api/settings/custom-status/[id]` | A · `settings.custom_status` update/delete | |
+| GET/PUT | `/api/settings/barcode` | A · `settings.barcode` view/update | singleton `BarcodeSetting` |
+| GET/PUT | `/api/settings/invoice-setting` | A · `settings.invoice_setting` view/update | singleton `InvoiceSetting`, read by the invoice print pages |
+| GET/POST | `/api/settings/invoice-import-templates` | A · `settings.invoice_import_setting` view/create | CSV column-mapping templates |
+| PATCH/DELETE | `/api/settings/invoice-import-templates/[id]` | A · `settings.invoice_import_setting` update/delete | |
+| GET/PUT | `/api/settings/bill-footer` | A · `settings.bill_footer` view/update | singleton `BillFooterSetting`, read by the invoice print pages |
+| GET | `/api/settings/backup` | A · `settings.backup_data` view | streams a JSON file (`Content-Disposition: attachment`) of every company-scoped table |
 | GET | `/api/accounts/chart` | A · `accounts.charts_of_accounts` read | 3-level COA tree |
 | GET | `/api/accounts/groups` | A · `accounts.charts_of_accounts` read | flat group list for pickers |
 | GET/POST | `/api/accounts/ledgers` | A · `accounts.charts_of_accounts` read/create | ledger search (`?search&groups&heads&contactKind`) / create (auto-code, opening → OPENING voucher) |

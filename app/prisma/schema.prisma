@@ -23,36 +23,44 @@ model Company {
   updatedAt            DateTime  @updatedAt
   deletedAt            DateTime?
 
-  branches             Branch[]
-  fiscalYears          FiscalYear[]
-  taxRates             TaxRate[]
-  info                 CompanyInfo?
-  roles                Role[]
-  userLinks            UserCompany[]
-  auditLogs            AuditLog[]
-  reminders            Reminder[]
-  notifications        Notification[]
-  accountHeads         AccountHead[]
-  accountGroups        AccountGroup[]
-  ledgers              Ledger[]
-  vouchers             Voucher[]
-  productCategories    ProductCategory[]
-  units                Unit[]
-  warehouses           Warehouse[]
-  products             Product[]
-  productBatches       ProductBatch[]
-  stockMovements       StockMovement[]
-  inventoryAdjustments InventoryAdjustment[]
-  salesDocs            SalesDoc[]
-  receipts             Receipt[]
-  purchaseDocs         PurchaseDoc[]
-  supplierPayments     SupplierPayment[]
-  fixedAssets          FixedAsset[]
-  depreciationRuns     DepreciationRun[]
-  billOfMaterials      BillOfMaterial[]
-  productionOrders     ProductionOrder[]
-  technicians          Technician[]
-  jobCards             JobCard[]
+  branches               Branch[]
+  fiscalYears            FiscalYear[]
+  taxRates               TaxRate[]
+  info                   CompanyInfo?
+  roles                  Role[]
+  userLinks              UserCompany[]
+  auditLogs              AuditLog[]
+  reminders              Reminder[]
+  notifications          Notification[]
+  accountHeads           AccountHead[]
+  accountGroups          AccountGroup[]
+  ledgers                Ledger[]
+  vouchers               Voucher[]
+  productCategories      ProductCategory[]
+  units                  Unit[]
+  warehouses             Warehouse[]
+  products               Product[]
+  productBatches         ProductBatch[]
+  stockMovements         StockMovement[]
+  inventoryAdjustments   InventoryAdjustment[]
+  salesDocs              SalesDoc[]
+  receipts               Receipt[]
+  purchaseDocs           PurchaseDoc[]
+  supplierPayments       SupplierPayment[]
+  fixedAssets            FixedAsset[]
+  depreciationRuns       DepreciationRun[]
+  billOfMaterials        BillOfMaterial[]
+  productionOrders       ProductionOrder[]
+  technicians            Technician[]
+  jobCards               JobCard[]
+  banks                  Bank[]
+  bankAccounts           BankAccount[]
+  customFields           CustomField[]
+  customStatuses         CustomStatus[]
+  barcodeSetting         BarcodeSetting?
+  invoiceSetting         InvoiceSetting?
+  invoiceImportTemplates InvoiceImportTemplate[]
+  billFooterSetting      BillFooterSetting?
 }
 
 model Branch {
@@ -416,6 +424,7 @@ model Ledger {
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   accountGroup AccountGroup  @relation(fields: [accountGroupId], references: [id], onDelete: Restrict)
   voucherLines VoucherLine[]
+  bankAccounts BankAccount[]
 
   @@unique([companyId, code])
   @@index([accountGroupId])
@@ -1351,4 +1360,156 @@ model Notification {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
+}
+
+/// ────────────────────────  SETTINGS SUB-MODULES  ─────────────────────
+
+/// Master list of bank names (Settings › Banks) — a dropdown source for
+/// BankAccount and, where useful elsewhere, cheque/bank-transfer entry.
+model Bank {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accounts BankAccount[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+/// The company's own registered bank accounts (Settings › Bank Detail) —
+/// optionally tied to a GL cash/bank Ledger, and referenced by
+/// BillFooterSetting to print "pay to" details on invoices.
+model BankAccount {
+  id            String    @id @default(cuid())
+  companyId     String
+  bankId        String
+  accountName   String
+  accountNumber String
+  branch        String?
+  swiftCode     String?
+  ledgerId      String?
+  isDefault     Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bank           Bank                @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  ledger         Ledger?             @relation(fields: [ledgerId], references: [id], onDelete: SetNull)
+  billFooterUses BillFooterSetting[]
+
+  @@index([companyId])
+  @@index([bankId])
+}
+
+/// User-definable extra fields (Key Features: "Flexible User Definable Field
+/// (UDF)"). MVP scope: definitions only — a module's entry form does not yet
+/// render these dynamically (Docs/PROGRESS.md tracks the follow-on).
+model CustomField {
+  id        String    @id @default(cuid())
+  companyId String
+  module    String // "SALES_INVOICE", "PRODUCT", "CONTACT", …
+  label     String
+  fieldType String // TEXT | NUMBER | DATE | SELECT | CHECKBOX
+  options   Json? // choice list for SELECT
+  required  Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, module])
+}
+
+/// User-definable status labels (Settings › Custom Status). MVP scope:
+/// definitions only — SalesDoc/PurchaseDoc.status stay on their fixed enum
+/// (their values feed GL/workflow logic); these are additional descriptive
+/// tags, not a replacement for the enum.
+model CustomStatus {
+  id        String    @id @default(cuid())
+  companyId String
+  module    String
+  label     String
+  color     String    @default("#64748b")
+  order     Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, module])
+}
+
+/// Singleton per company (Settings › Barcode). Configuration only — no
+/// barcode-symbol renderer is wired up yet (Docs/PROGRESS.md).
+model BarcodeSetting {
+  id            String   @id @default(cuid())
+  companyId     String   @unique
+  symbology     String   @default("CODE128")
+  prefix        String?
+  nextNumber    Int      @default(1)
+  labelWidthMm  Int      @default(40)
+  labelHeightMm Int      @default(25)
+  showPrice     Boolean  @default(true)
+  showName      Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Singleton per company (Settings › Invoice Setting). Display/behavior
+/// toggles read by the Sales/Purchase invoice detail+print pages and
+/// pre-filled into the New Invoice form — NOT wired into GL rounding.
+model InvoiceSetting {
+  id                 String   @id @default(cuid())
+  companyId          String   @unique
+  showHsCode         Boolean  @default(true)
+  showDiscountColumn Boolean  @default(true)
+  showBankDetails    Boolean  @default(true)
+  showQrCode         Boolean  @default(true)
+  defaultTermsText   String?
+  defaultNotes       String?
+  updatedAt          DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Column-mapping template for bulk invoice CSV import (Settings › Invoice
+/// Import Setting). MVP scope: the mapping template only — the upload+parse
+/// execution pipeline is a follow-on (Docs/PROGRESS.md).
+model InvoiceImportTemplate {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  columnMap Json // { csvColumnHeader: targetField }
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+/// Singleton per company (Settings › Bill Footer) — printed on the Sales/
+/// Purchase invoice detail+print pages below the totals block.
+model BillFooterSetting {
+  id                  String   @id @default(cuid())
+  companyId           String   @unique
+  termsAndConditions  String?
+  bankAccountId       String?
+  authorizedSignatory String?
+  footerNote          String?
+  updatedAt           DateTime @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
 }

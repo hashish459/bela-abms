@@ -215,6 +215,31 @@ no stock) billed at VAT 13% produced exactly the hand-calculated Rs. 4,520.00 in
 (3000+1000 taxable, 520 VAT), consumed exactly 2 units of stock, and correctly auto-booked a
 cash receipt — all via the *unmodified* Sales invoicing path.
 
+### Settings sub-modules — ✅ BUILT (session 19)
+The 12 previously-stubbed Settings sub-pages (Signin & Security, User & Permissions, Banks,
+Bank Detail, Bill Footer, Invoice Setting, Custom Fields, Custom Status, Barcode, Invoice
+Import Setting, Backup Data, Tour). User & Permissions needed **no new models** — `Role` /
+`PermissionModule` / `RolePermission` / `UserRole` / `UserCompany` / `Branch` already existed
+from the platform foundation; only the UI (a full CRUD permission-matrix editor) was missing.
+
+| Model | Notes |
+|---|---|
+| **`Bank`** | master bank-name list; `unique(companyId, name)` |
+| **`BankAccount`** | the company's own registered accounts; `bankId→Bank`, optional `ledgerId→Ledger` tie-in, one `isDefault` per company |
+| **`CustomField`** | UDF definitions (`module`, `label`, `fieldType`, `options?` json, `required`) — **MVP scope: definitions only**, no entry-form rendering yet |
+| **`CustomStatus`** | descriptive per-module labels (`module`, `label`, `color`) — **MVP scope: additive tags**, `SalesDoc`/`PurchaseDoc.status` stays on its fixed enum since GL posting depends on it |
+| **`BarcodeSetting`** | singleton per company (`@unique companyId`); symbology/prefix/label size — config only, no renderer wired |
+| **`InvoiceSetting`** | singleton per company; column-visibility toggles + default terms/notes, read live by the Sales/Purchase invoice print pages built in session 17 |
+| **`InvoiceImportTemplate`** | CSV column-mapping template (`columnMap` json) — **MVP scope: mapping only**, upload/parse pipeline is a follow-on |
+| **`BillFooterSetting`** | singleton per company; terms, `bankAccountId→BankAccount`, signatory, footer note — printed on the same invoice print pages |
+
+**Key design point:** `InvoiceSetting`/`BillFooterSetting` aren't just stored-and-ignored —
+`getInvoiceSetting()`/`getBillFooterForPrint()` are read directly by
+`sales/invoice/[id]/page.tsx` and `purchase/purchase-bills/[id]/page.tsx` at request time, so
+toggling "Show HS Code column" off in Settings immediately changes what prints on every
+invoice. Purchase invoices intentionally never print the company's own bank details (a
+payable, not a receivable) even though the setting is shared.
+
 ### CRM
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·
 `crm target` · `visit history` · `location point` (field-sales GPS).

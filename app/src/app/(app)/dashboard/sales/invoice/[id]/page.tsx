@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { getSalesDoc } from "@/server/sales/service";
-import { getCompanyInfo } from "@/server/settings/service";
+import { getBillFooterForPrint, getCompanyInfo, getInvoiceSetting } from "@/server/settings/service";
 import { InvoiceDetailView } from "./invoice-detail-view";
 
 export const metadata = { title: "Sales Invoice — Bela ABMS" };
@@ -16,9 +16,11 @@ export default async function SalesInvoiceDetailPage({
   if (!can(s.permissions, "sales.sales_invoice", "read")) redirect("/dashboard");
 
   const { id } = await params;
-  const [doc, company] = await Promise.all([
+  const [doc, company, invoiceSetting, billFooter] = await Promise.all([
     getSalesDoc(s.companyId!, id).catch(() => null),
     getCompanyInfo(s.companyId!),
+    getInvoiceSetting(s.companyId!),
+    getBillFooterForPrint(s.companyId!),
   ]);
   if (!doc) notFound();
 
@@ -56,6 +58,8 @@ export default async function SalesInvoiceDetailPage({
         })),
       }}
       company={company}
+      invoiceSetting={invoiceSetting}
+      billFooter={billFooter}
     />
   );
 }

@@ -13,6 +13,82 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 19 — 2026-09-12 (The 12 remaining Settings sub-pages)
+Closed out the client's oldest still-open ask (first raised in session 17, deferred behind
+the letterhead/logo work and then the Reports catalogue): every Settings sub-page beyond
+Company Info/Fiscal Year/Tax was still hitting a 404 — `settings/[sub-page]` had no
+`page.tsx` and no catch-all inside the `settings/` folder, so the nav links were fully wired
+but dead. Built all 12: Signin & Security, User & Permissions, Custom Fields, Custom Status,
+Banks, Bank Detail, Bill Footer, Barcode, Invoice Setting, Invoice Import Setting, Backup
+Data, Tour. Also fixed a real bug found while doing this: `settings/layout.tsx`'s tab list
+was missing "Tour" even though the menu seed already had a route+permission for it.
+
+**Schema** (migration `20260912052338_settings_submodules`): 8 new models — `Bank`,
+`BankAccount`, `CustomField`, `CustomStatus`, `BarcodeSetting`, `InvoiceSetting`,
+`InvoiceImportTemplate`, `BillFooterSetting`. User & Permissions needed **zero new
+models** — `Role`/`PermissionModule`/`RolePermission`/`UserRole`/`UserCompany`/`Branch`
+already existed from the platform foundation (session 3); only the CRUD UI was missing.
+Full detail in `Docs/DATABASE.md`'s new "Settings sub-modules" section.
+
+**User & Permissions** is the highest-value piece: a real 3-tab page (Users / Roles &
+Permissions / Companies) with a full permission-matrix editor — per-module
+Create/Read/Update/Delete checkboxes grouped exactly like the app's own navigation, "Grant
+all"/"Clear" per group, gated by the finer-grained `settings.roles_and_permissions` key
+(distinct from `settings.users`) so a report-only auditor role doesn't need role-editing
+rights just to see the Users tab. Added two safety checks that don't exist in the reference
+app but felt necessary for a real accounting system: a user can't disable their own account,
+and the last active ADMIN-type user can't be disabled by anyone.
+
+**Real wiring, not just stored-and-ignored settings** — the two riskiest-to-get-wrong pieces:
+- `InvoiceSetting` (show HS Code / Discount column / bank details / QR) and
+  `BillFooterSetting` (terms, bank account, signatory, footer note) are read live by
+  `sales/invoice/[id]/page.tsx` and `purchase/purchase-bills/[id]/page.tsx` — toggling a
+  setting changes what prints immediately, verified by flipping "Show HS Code" off and
+  confirming the column actually disappeared from a real invoice, then flipping it back.
+  Purchase invoices never print the company's own bank details (payable, not receivable)
+  even though the underlying setting is shared with Sales.
+- Added `src/components/print-bill-footer.tsx` as the shared renderer both invoice detail
+  pages now use, replacing the static "Prepared by / Authorized signature" placeholder from
+  session 17 with the real configured terms/bank/signatory/note.
+
+**Deliberately MVP-scoped, and said so in the UI itself** (same judgment call as the Reports
+session's gap-cards, applied inline this time since these aren't missing — they're partial):
+Custom Fields and Custom Status are definitions-only (no dynamic form rendering yet — wiring
+that into every entry form across the app is a much larger project, and `SalesDoc`/
+`PurchaseDoc.status` deliberately stays on its fixed enum since GL posting logic depends on
+specific values); Barcode is configuration-only (no symbol renderer); Invoice Import Setting
+is the column-mapping template only (no CSV upload/parse pipeline).
+
+**Signin & Security** does password change (self-service — no permission-module gate, since
+every authenticated user must be able to change their own password regardless of role, same
+as logout) and lists/revokes active sessions from `RefreshToken`. Found the CSRF gap while
+building it: `guard()` requires a permission key, but this route legitimately has none, so
+exported `assertCsrf()` from `src/lib/guard.ts` for routes that need the CSRF check without
+a permission check.
+
+**Backup Data** streams a real JSON export (fiscal years, chart of accounts, vouchers,
+products, sales/purchase docs, etc.) via `Content-Disposition: attachment` — no restore path
+yet, explicitly labeled as an offline archive.
+
+Verified everything live rather than trusting typecheck: created a real Bank → Bank Account →
+Bill Footer chain end-to-end and confirmed it printed correctly on an actual Sales Invoice
+(bank name/account/branch, terms, signatory, thank-you note all appeared exactly where
+configured); created a new "Auditor" role via the matrix editor with a full group grant and
+confirmed it appeared as an assignable role on the Add User form (proving the
+Role→RolePermission→UserRole chain works end-to-end); toggled Invoice Setting's HS Code
+column off and back on against a live invoice. Cleaned up the two pure-test artifacts
+(the Auditor role, a test import template) afterward via direct authenticated `fetch()`
+calls, since the delete buttons' native `confirm()` dialogs can't be driven by browser
+automation — everything real (Nabil Bank, its account, the Bill Footer text) was left in
+place as genuine starter configuration. `npm run typecheck`, `npx eslint src`, and a clean
+`rm -rf .next && npm run build` all pass.
+
+**Nothing client-requested remains outstanding** as of this session — Vouchers UI (17),
+printed letterhead (17), Reports catalogue (18), and now all Settings sub-pages (19) close
+out every explicit ask made since session 16's Enterprise Hardening pass. Documented gaps
+(Batch/Expiry reports, Annex 13/5, Budget module, dynamic Custom Fields/Status, barcode
+rendering, CSV import execution) are flagged in-product, not silently missing.
+
 ### Session 18 — 2026-09-11 (Reports catalogue — cloned from the reference app)
 Client shared `user_manuals/Key Features.docx` (the vendor's original marketing sheet —
 "Zoom in (Drill Down) from almost all Reports to Source Voucher" is literally in it) and

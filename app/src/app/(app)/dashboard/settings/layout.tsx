@@ -19,6 +19,7 @@ const ALL_TABS: (SettingsTab & { perm: string })[] = [
   { title: "Invoice Import Setting", href: "/dashboard/settings/invoice-import-setting", perm: "settings.invoice_import_setting" },
   { title: "Backup Data", href: "/dashboard/settings/backup", perm: "settings.backup_data" },
   { title: "Signin & Security", href: "/dashboard/settings/signin-security", perm: "settings.signin_and_security" },
+  { title: "Tour", href: "/dashboard/settings/tour", perm: "settings.tour" },
 ];
 
 export default async function SettingsLayout({ children }: LayoutProps<"/">) {

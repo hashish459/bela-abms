@@ -16,7 +16,7 @@ export const CSRF_HEADER = "x-csrf-token";
  * same-origin requests. Only enforced for mutating actions; a `read` can't
  * change state, so it isn't a CSRF target.
  */
-async function assertCsrf() {
+export async function assertCsrf() {
   const [jar, hdrs] = await Promise.all([cookies(), headers()]);
   const cookieToken = jar.get(CSRF_COOKIE)?.value;
   const headerToken = hdrs.get(CSRF_HEADER);
