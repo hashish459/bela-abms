@@ -573,6 +573,49 @@ export async function listPurchaseDocs(
   };
 }
 
+/** Flat, actionable outstanding-invoice list (Purchase › Payable Amount) —
+ * one row per invoice, unlike the Reports › Aging Report's per-supplier
+ * bucketed totals. Mirrors sales/service.ts's listReceivables. */
+export async function listPayables(companyId: string, opts: { search?: string } = {}) {
+  const where: Prisma.PurchaseDocWhereInput = {
+    companyId, type: "INVOICE",
+    status: { in: ["OPEN", "PARTIALLY_PAID", "RETURNED"] },
+    ...(opts.search
+      ? { OR: [{ number: { contains: opts.search, mode: "insensitive" } }, { supplierName: { contains: opts.search, mode: "insensitive" } }] }
+      : {}),
+  };
+  const invoices = await db.purchaseDoc.findMany({
+    where,
+    orderBy: { date: "asc" },
+    select: { id: true, number: true, date: true, supplierName: true, grandTotal: true, amountPaid: true },
+  });
+  if (!invoices.length) return { rows: [], total: "0.00" };
+
+  const debits = await db.purchaseDoc.groupBy({
+    by: ["reversesDocId"],
+    where: { companyId, type: "DEBIT_NOTE", reversesDocId: { in: invoices.map((i) => i.id) } },
+    _sum: { grandTotal: true },
+  });
+  const debitedById = new Map(debits.map((d) => [d.reversesDocId!, D(d._sum.grandTotal ?? 0)]));
+  const today = new Date();
+
+  const rows = invoices
+    .map((inv) => {
+      const outstanding = D(inv.grandTotal).sub(inv.amountPaid).sub(debitedById.get(inv.id) ?? 0);
+      return {
+        id: inv.id, number: inv.number, date: inv.date.toISOString().slice(0, 10),
+        supplier: inv.supplierName ?? "Cash purchase",
+        grandTotal: inv.grandTotal.toFixed(2),
+        outstanding: outstanding.toFixed(2),
+        daysOverdue: Math.max(0, Math.floor((today.getTime() - inv.date.getTime()) / 86_400_000)),
+      };
+    })
+    .filter((r) => Number(r.outstanding) > 0.01)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  return { rows, total: rows.reduce((a, r) => a + Number(r.outstanding), 0).toFixed(2) };
+}
+
 export async function getPurchaseDoc(companyId: string, id: string) {
   const d = await db.purchaseDoc.findFirst({
     where: { id, companyId },

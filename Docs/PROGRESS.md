@@ -13,6 +13,90 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 24 — 2026-09-12 (Full menu audit + 12 stub menu items built)
+Client asked point-blank: "do all menu and sub menu is implemented all features?" Rather than
+answer from the session-by-session narrative in `Docs/PROGRESS.md`/memory (which only tracks
+what was *deliberately worked on*), ran a full agent audit of every seeded menu/submenu item
+against actual `page.tsx` files. Finding: **the narrative was significantly wrong** — 24
+submenu items across 8 areas were stubs (fall through to `[...slug]`'s "Module not yet
+implemented"), not the 1-2 the running gap-list implied. `prisma/seed.ts` seeds a real route
++ permission key for every item the reference app's sidebar shows, independent of whether it
+was ever built — the same pattern session 20 found once with the Budget nav item, just far
+more widespread than any prior session had checked for.
+
+The 24 stubs: five entire unbuilt modules (**CRM**, **Store Builder**, **Token**,
+**Documents** — reference-app features with no obvious fit for a manufacturing company,
+never built at all) plus **Printing Cost Register** (Sales) — the reference backend's own
+model inventory flags this as a print-shop industry vertical ("likely trigger: print shops"),
+same non-fit reasoning — and 12 "scattered stub" items inside otherwise-complete modules.
+Client said skip the five whole-module/vertical items, build the 12 scattered ones.
+
+**None of the 12 have any documented spec.** `Docs/DISCOVERY-LOG.md` itself lists them
+"not yet inspected"; `Docs/ASSUMPTIONS.md` already flags this exact class of problem (A13:
+"which [reference-backend features] are in scope, and in what order?") without resolving it
+for these specifically. Per the client's explicit instruction, built all 12 using standard
+accounting/Nepali-business-practice interpretations rather than guessing silently or blocking
+on a discovery pass this session has no reference-app credentials to run — every judgment
+call is flagged in a `schema.prisma` comment and in `Docs/DATABASE.md`, not presented as a
+verified clone. Two were reused, not new: **Proforma Invoice** just adds
+`PROFORMA_INVOICE` to the existing `SalesDocType` enum (same non-posting draft pattern as
+Quotation, reusing `createDraft`/`convertDoc`/`<DraftWorkspace>` end to end — `PF-` prefix);
+**Expenses** wires up `VoucherType.EXPENSE`, which had existed in the schema and the
+voucher-number-prefix map since the platform foundation but had never actually been posted
+anywhere — reuses `createVoucher()`/`<VoucherWorkspace>` verbatim, the same component
+Journal/Contra Voucher already use. **Receivable Amount**/**Payable Amount** (flat,
+actionable per-invoice lists) and **Cash & Bank Account** (live per-ledger balances filtered
+to the "CCE" account head) are read-only views with no new model, built by reusing
+`receivablesAging()`/`payablesAging()`'s underlying query and `trialBalance()`'s existing
+per-ledger computation respectively, rather than recomputing anything from scratch.
+
+Six new models for the rest, each deliberately scoped to avoid double-counting what an
+existing document already posts: **`Chalani`**/`ChalaniItem` (Sales — a dispatch/delivery
+register, paperwork only, since the Sales Invoice already owns GL+stock); **`Cheque`**
+(Sales — post-dated cheque clearance tracking; `PaymentMode.CHEQUE` already existed for the
+GL side, this is the physical-instrument register, not a second posting); **`GoodsReceipt`**/
+`GoodsReceiptItem` (Purchase — ordered-vs-received reconciliation before the supplier's
+invoice arrives, no stock/GL, since `createPurchaseInvoice()` still owns both);
+**`ImportShipment`** (Purchase — customs/compliance register alongside a Purchase Invoice's
+own excise/custom duty fields, no GL); **`WarehouseTransfer`**/`WarehouseTransferItem`
+(Inventory — the one that actually moves real stock: a genuine `TRANSFER_OUT`+`TRANSFER_IN`
+`StockMovement` pair per line via the existing `postStockMovement()`, no GL/unit-cost,
+matching `InventoryAdjustment`'s own precedent that a transfer changes location, never
+value); **`BalanceConfirmation`** (Accounts — a frozen point-in-time balance snapshot for
+customer/supplier reconciliation, computed live from `trialBalance({asOf})` at creation,
+never repostable since it's a statement about a balance, not a transaction).
+
+**Key design point — Inventory Transfer was reinterpreted, not built as named.** Nothing
+distinguishes "Warehouse Transfer" from "Inventory Transfer" as two menu items anywhere in
+this project's docs, and this app's own list+create-modal convention means a second
+transfer-creation screen would just duplicate Warehouse Transfer's own history list.
+Reinterpreted it as `stockMovementLedger()` — a read-only, filterable view of *every*
+`StockMovement` row across every kind (purchase/sale/adjustment/transfer/manufacture), a
+system-wide movement ledger that genuinely didn't exist anywhere before, rather than a
+redundant second transfer form.
+
+Verified live for all 12, not just typecheck: created a real record through every new
+form, confirmed each one's number-prefix sequence (`PF-`, `CH-`, `EX-`, `GRN-`, `IMP-`,
+`WT-`), confirmed the Expenses voucher actually posts a balanced GL entry, confirmed the
+Warehouse Transfer posts a real paired stock movement that shows up correctly in Inventory
+Transfer's ledger with its filters working, confirmed Cheque and Balance Confirmation's
+inline status dropdowns persist via PATCH, and confirmed Receivable/Payable Amount's search
+and totals match the underlying invoice data. `npm run typecheck`, `npx eslint src` (clean
+on the first pass — no fixes needed), and a clean `rm -rf .next && npm run build` all pass.
+
+**Menu completeness after this session** (correcting an arithmetic slip in the audit's own
+summary count — the itemized stub list actually totals 24, not the "19" the audit's summary
+line stated; always recount from the itemized list, not a summary tally, before quoting a
+number): all 12 client-approved items are now built. What's left, all by explicit client
+decision this session to skip: **CRM** (5 items — Dashboard, Clients, Partners, Follow Ups,
+Reports), **Store Builder** (4 — Theme Settings, Hero Sliders, Offer Ads, Reviews),
+**Token**, **Documents**, and **Printing Cost Register** (a print-shop industry-vertical
+feature with no fit here) — 12 items across 5 areas, all reference-app features with no
+established fit for a manufacturing/building-materials company, same reasoning as Budget's
+session-20 reinterpretation. Plus two still-open partial gaps found in the same audit:
+Invoice Import Setting's CSV upload/parse pipeline (session 19 — mapping-only) and Backup
+Data's restore/import path (export-only; not previously tracked in this log).
+
 ### Session 23 — 2026-09-12 (EAN13 barcode rendering — closing the second-to-last gap)
 Continued from an open-ended "continue" with no specific list, same pattern as session 20 —
 worked through the two remaining documented gaps by value, starting with the more

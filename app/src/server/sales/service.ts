@@ -127,11 +127,10 @@ export async function createDraft(
     const totals = calcSalesTotals(calcLines, input.invoiceDiscount ?? 0);
     const fy = await tx.fiscalYear.findUnique({ where: { id: fiscalYearId }, select: { name: true } });
     const seq = await nextNumber(tx, companyId, fiscalYearId, `sales:${input.type}`);
-    const number = formatVoucherNumber(
-      input.type === "QUOTATION" ? "SALES" : "SALES", // prefix handled below
-      fy!.name,
-      seq,
-    ).replace(/^SA-/, input.type === "QUOTATION" ? "QU-" : "SO-");
+    const DRAFT_PREFIX: Record<typeof input.type, string> = {
+      QUOTATION: "QU-", SALES_ORDER: "SO-", PROFORMA_INVOICE: "PF-",
+    };
+    const number = formatVoucherNumber("SALES", fy!.name, seq).replace(/^SA-/, DRAFT_PREFIX[input.type]);
 
     const customer = orNull(input.customerLedgerId)
       ? await tx.ledger.findFirst({ where: { id: input.customerLedgerId, companyId }, select: { id: true, name: true, panNumber: true } })
@@ -694,6 +693,50 @@ export async function listSalesDocs(
   };
 }
 
+/** Flat, actionable outstanding-invoice list (Sales › Receivable Amount) —
+ * one row per invoice, unlike the Reports › Aging Report's per-customer
+ * bucketed totals. Both read the same underlying data; this view exists to
+ * let a user jump straight to a specific overdue invoice. */
+export async function listReceivables(companyId: string, opts: { search?: string } = {}) {
+  const where: Prisma.SalesDocWhereInput = {
+    companyId, type: "INVOICE",
+    status: { in: ["OPEN", "PARTIALLY_PAID", "RETURNED"] },
+    ...(opts.search
+      ? { OR: [{ number: { contains: opts.search, mode: "insensitive" } }, { customerName: { contains: opts.search, mode: "insensitive" } }] }
+      : {}),
+  };
+  const invoices = await db.salesDoc.findMany({
+    where,
+    orderBy: { date: "asc" },
+    select: { id: true, number: true, date: true, customerName: true, grandTotal: true, amountPaid: true },
+  });
+  if (!invoices.length) return { rows: [], total: "0.00" };
+
+  const credits = await db.salesDoc.groupBy({
+    by: ["reversesDocId"],
+    where: { companyId, type: "CREDIT_NOTE", reversesDocId: { in: invoices.map((i) => i.id) } },
+    _sum: { grandTotal: true },
+  });
+  const creditedById = new Map(credits.map((c) => [c.reversesDocId!, D(c._sum.grandTotal ?? 0)]));
+  const today = new Date();
+
+  const rows = invoices
+    .map((inv) => {
+      const outstanding = D(inv.grandTotal).sub(inv.amountPaid).sub(creditedById.get(inv.id) ?? 0);
+      return {
+        id: inv.id, number: inv.number, date: inv.date.toISOString().slice(0, 10),
+        customer: inv.customerName ?? "Cash sale",
+        grandTotal: inv.grandTotal.toFixed(2),
+        outstanding: outstanding.toFixed(2),
+        daysOverdue: Math.max(0, Math.floor((today.getTime() - inv.date.getTime()) / 86_400_000)),
+      };
+    })
+    .filter((r) => Number(r.outstanding) > 0.01)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  return { rows, total: rows.reduce((a, r) => a + Number(r.outstanding), 0).toFixed(2) };
+}
+
 export async function getSalesDoc(companyId: string, id: string) {
   const d = await db.salesDoc.findFirst({
     where: { id, companyId },
@@ -745,8 +788,8 @@ export async function convertDoc(
   if (doc.status === "CONVERTED") throw errors.conflict("Already converted");
   if (toType === "SALES_ORDER" && doc.type !== "QUOTATION")
     throw errors.badRequest("Only quotations convert to a sales order");
-  if (toType === "INVOICE" && !["QUOTATION", "SALES_ORDER"].includes(doc.type))
-    throw errors.badRequest("Only quotations and sales orders convert to an invoice");
+  if (toType === "INVOICE" && !["QUOTATION", "SALES_ORDER", "PROFORMA_INVOICE"].includes(doc.type))
+    throw errors.badRequest("Only quotations, sales orders and proforma invoices convert to an invoice");
 
   return {
     prefill: {

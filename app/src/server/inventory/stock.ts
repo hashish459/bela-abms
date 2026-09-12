@@ -307,4 +307,54 @@ export async function stockByWarehouse(companyId: string, productId: string) {
   }));
 }
 
+/**
+ * Every stock movement across every product/warehouse/kind (Inventory ›
+ * Inventory Transfer). Distinct from Warehouse Transfer's create+own-history
+ * view — reinterpreted as the system-wide movement ledger, since a second
+ * transfer-creation screen would just duplicate it (see Docs/PROGRESS.md).
+ */
+export async function stockMovementLedger(
+  companyId: string,
+  opts: { productId?: string; warehouseId?: string; kind?: StockMovementKind; from?: Date; to?: Date; page?: number } = {},
+) {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = 30;
+  const where: Prisma.StockMovementWhereInput = {
+    companyId,
+    ...(opts.productId ? { productId: opts.productId } : {}),
+    ...(opts.warehouseId ? { warehouseId: opts.warehouseId } : {}),
+    ...(opts.kind ? { kind: opts.kind } : {}),
+    ...(opts.from || opts.to
+      ? { date: { ...(opts.from ? { gte: opts.from } : {}), ...(opts.to ? { lte: opts.to } : {}) } }
+      : {}),
+  };
+  const [rows, total] = await Promise.all([
+    db.stockMovement.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true, date: true, kind: true, qty: true, sourceType: true, narration: true,
+        product: { select: { name: true, sku: true } },
+        warehouse: { select: { name: true } },
+      },
+    }),
+    db.stockMovement.count({ where }),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      date: r.date.toISOString().slice(0, 10),
+      kind: r.kind,
+      product: `${r.product.sku} — ${r.product.name}`,
+      warehouse: r.warehouse.name,
+      qty: D(r.qty).toFixed(3),
+      source: r.sourceType ?? "—",
+      narration: r.narration,
+    })),
+    total, page, pageSize,
+  };
+}
+
 export { nextNumber };

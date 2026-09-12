@@ -43,7 +43,7 @@ const voucherLine = z
   });
 
 export const voucherCreate = z.object({
-  type: z.enum(["JOURNAL", "CONTRA"]).default("JOURNAL"),
+  type: z.enum(["JOURNAL", "CONTRA", "EXPENSE"]).default("JOURNAL"),
   date: isoDate,
   narration: z.string().max(500).optional().or(z.literal("")),
   lines: z.array(voucherLine).min(2),

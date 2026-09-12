@@ -65,6 +65,12 @@ model Company {
   budgetHeadings         BudgetHeading[]
   budgetFunds            BudgetFund[]
   budgets                Budget[]
+  chalanis               Chalani[]
+  cheques                Cheque[]
+  goodsReceipts          GoodsReceipt[]
+  importShipments        ImportShipment[]
+  warehouseTransfers     WarehouseTransfer[]
+  balanceConfirmations   BalanceConfirmation[]
 }
 
 model Branch {
@@ -427,10 +433,11 @@ model Ledger {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  accountGroup AccountGroup  @relation(fields: [accountGroupId], references: [id], onDelete: Restrict)
-  voucherLines VoucherLine[]
-  bankAccounts BankAccount[]
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountGroup         AccountGroup          @relation(fields: [accountGroupId], references: [id], onDelete: Restrict)
+  voucherLines         VoucherLine[]
+  bankAccounts         BankAccount[]
+  balanceConfirmations BalanceConfirmation[]
 
   @@unique([companyId, code])
   @@index([accountGroupId])
@@ -588,9 +595,11 @@ model Warehouse {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   stockMovements StockMovement[]
   batches        ProductBatch[]
+  transfersFrom  WarehouseTransfer[] @relation("WarehouseTransferFrom")
+  transfersTo    WarehouseTransfer[] @relation("WarehouseTransferTo")
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -762,6 +771,7 @@ model InventoryAdjustmentLine {
 enum SalesDocType {
   QUOTATION
   SALES_ORDER
+  PROFORMA_INVOICE
   INVOICE
   CREDIT_NOTE
 }
@@ -832,6 +842,8 @@ model SalesDoc {
   customStatus CustomStatus?  @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
   items        SalesDocItem[]
   receipts     Receipt[]
+  chalanis     Chalani[]
+  cheques      Cheque[]
 
   @@unique([companyId, number])
   @@index([companyId, type, date])
@@ -963,11 +975,13 @@ model PurchaseDoc {
   // additive metadata, editable any time; never drives GL/workflow logic like `status` does.
   customStatusId String?
 
-  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fiscalYear   FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
-  customStatus CustomStatus?     @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
-  items        PurchaseDocItem[]
-  payments     SupplierPayment[]
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear      FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  customStatus    CustomStatus?     @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
+  items           PurchaseDocItem[]
+  payments        SupplierPayment[]
+  goodsReceipts   GoodsReceipt[]
+  importShipments ImportShipment[]
 
   @@unique([companyId, number])
   @@index([companyId, type, date])
@@ -1635,4 +1649,232 @@ model CustomFieldValue {
 
   @@unique([customFieldId, entityId])
   @@index([companyId, entityId])
+}
+
+/// ────────────────────  Session 24 — dynamic-form gap items  ───────────────
+/// Twelve nav items were seeded (real route + permission key) but never built
+/// — see Docs/PROGRESS.md session 24. None of these are documented in the
+/// reference app's own discovery notes (Docs/DISCOVERY-LOG.md explicitly
+/// lists them "not yet inspected"), so every model below is this project's
+/// own best-judgment interpretation of the menu label, not a verified clone
+/// of the reference app's actual screen — flagged here and in PROGRESS.md
+/// rather than silently presented as equivalent.
+
+/// Dispatch/delivery register (Sales › Chalani) — Nepali business term for an
+/// outward goods-dispatch note. Pure paperwork: no GL or stock impact, since
+/// the Sales Invoice already owns both when the sale is actually invoiced.
+/// Exists to give a paper trail for goods that physically leave the premises
+/// (vehicle/driver details), optionally before or alongside invoicing.
+model Chalani {
+  id               String    @id @default(cuid())
+  companyId        String
+  fiscalYearId     String
+  number           String
+  date             DateTime  @db.Date
+  customerLedgerId String?
+  customerName     String?
+  salesDocId       String? // optional link to the Sales Invoice this dispatch is for
+  vehicleNo        String?
+  driverName       String?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesDoc SalesDoc?     @relation(fields: [salesDocId], references: [id], onDelete: SetNull)
+  items    ChalaniItem[]
+
+  @@unique([companyId, number])
+  @@index([companyId, fiscalYearId])
+}
+
+model ChalaniItem {
+  id          String  @id @default(cuid())
+  chalaniId   String
+  productId   String?
+  description String
+  qty         Decimal @db.Decimal(18, 3)
+  order       Int     @default(0)
+
+  chalani Chalani @relation(fields: [chalaniId], references: [id], onDelete: Cascade)
+
+  @@index([chalaniId])
+}
+
+enum ChequeStatus {
+  PENDING
+  DEPOSITED
+  CLEARED
+  BOUNCED
+}
+
+/// Post-dated cheque register (Sales › Cheque) — tracks the physical
+/// instrument and its clearance status. `PaymentMode.CHEQUE` already exists
+/// on SalesDoc/Receipt for the GL side of a cheque payment; this is the
+/// non-financial register of the cheques themselves (bounced/cleared
+/// tracking), not a second posting of the same money.
+model Cheque {
+  id               String       @id @default(cuid())
+  companyId        String
+  chequeNo         String
+  bankName         String
+  chequeDate       DateTime     @db.Date
+  amount           Decimal      @db.Decimal(18, 2)
+  customerLedgerId String?
+  customerName     String?
+  salesDocId       String? // optional link to the invoice this cheque pays
+  status           ChequeStatus @default(PENDING)
+  notes            String?
+  createdById      String?
+  createdAt        DateTime     @default(now())
+  deletedAt        DateTime?
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesDoc SalesDoc? @relation(fields: [salesDocId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+}
+
+/// Goods Received Note (Purchase › Goods Received) — records what was
+/// physically counted in against a Purchase Order, before the supplier's
+/// invoice arrives. Deliberately posts no stock or GL: the actual Purchase
+/// Invoice still owns both (src/server/purchase/service.ts), so a GRN here
+/// can never double-count a receipt already booked at invoice time. Its
+/// value is the paper trail / discrepancy check between ordered and received
+/// quantities.
+model GoodsReceipt {
+  id               String    @id @default(cuid())
+  companyId        String
+  fiscalYearId     String
+  number           String
+  date             DateTime  @db.Date
+  supplierLedgerId String?
+  supplierName     String?
+  purchaseOrderId  String? // optional link to the Purchase Order being received against
+  notes            String?
+  createdById      String?
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseDoc?       @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  items         GoodsReceiptItem[]
+
+  @@unique([companyId, number])
+  @@index([companyId, fiscalYearId])
+}
+
+model GoodsReceiptItem {
+  id             String   @id @default(cuid())
+  goodsReceiptId String
+  productId      String?
+  description    String
+  qtyOrdered     Decimal? @db.Decimal(18, 3)
+  qtyReceived    Decimal  @db.Decimal(18, 3)
+  order          Int      @default(0)
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+
+  @@index([goodsReceiptId])
+}
+
+/// Import shipment / customs tracking register (Purchase › Imports) — the
+/// existing PurchaseDoc line items already carry customs/excise duty for
+/// landed-cost valuation; this is a compliance-side register on top of that
+/// (bill of entry, country of origin, port), not a second purchase-posting
+/// path. No GL impact — the linked Purchase Invoice already owns that.
+model ImportShipment {
+  id                String    @id @default(cuid())
+  companyId         String
+  fiscalYearId      String
+  number            String
+  date              DateTime  @db.Date
+  supplierLedgerId  String?
+  supplierName      String?
+  countryOfOrigin   String?
+  billOfEntryNo     String?
+  portOfEntry       String?
+  purchaseInvoiceId String? // optional link to the resulting Purchase Invoice
+  notes             String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  deletedAt         DateTime?
+
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseInvoice PurchaseDoc? @relation(fields: [purchaseInvoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, fiscalYearId])
+}
+
+/// Inter-warehouse stock transfer (Inventory › Warehouse Transfer) — an
+/// actual physical movement, so unlike Chalani/GoodsReceipt/ImportShipment
+/// above it DOES post real StockMovement rows (a TRANSFER_OUT + TRANSFER_IN
+/// pair per line). No GL impact and no unit cost tracked, matching
+/// InventoryAdjustment's existing precedent exactly — a transfer changes
+/// where stock sits, never its total value, so there is nothing to post.
+model WarehouseTransfer {
+  id              String    @id @default(cuid())
+  companyId       String
+  fiscalYearId    String
+  number          String
+  date            DateTime  @db.Date
+  fromWarehouseId String
+  toWarehouseId   String
+  notes           String?
+  createdById     String?
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  company       Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromWarehouse Warehouse               @relation("WarehouseTransferFrom", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse               @relation("WarehouseTransferTo", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  items         WarehouseTransferItem[]
+
+  @@unique([companyId, number])
+  @@index([companyId, fiscalYearId])
+}
+
+model WarehouseTransferItem {
+  id         String  @id @default(cuid())
+  transferId String
+  productId  String
+  batchId    String?
+  qty        Decimal @db.Decimal(18, 3)
+  order      Int     @default(0)
+
+  transfer WarehouseTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+}
+
+enum BalanceConfirmationStatus {
+  PENDING
+  CONFIRMED
+  DISPUTED
+}
+
+/// Balance confirmation letter (Accounts › Balance Confirmation) — a
+/// point-in-time snapshot of a customer/supplier ledger's balance, sent to
+/// them for confirmation (standard audit/reconciliation practice). Purely a
+/// record of what was sent and its outcome — never repostable, since it
+/// isn't a transaction, just a statement about one.
+model BalanceConfirmation {
+  id          String                    @id @default(cuid())
+  companyId   String
+  ledgerId    String
+  asOfDate    DateTime                  @db.Date
+  balance     Decimal                   @db.Decimal(18, 2)
+  balanceType String // "DR" | "CR" snapshot at generation time
+  status      BalanceConfirmationStatus @default(PENDING)
+  notes       String?
+  createdById String?
+  createdAt   DateTime                  @default(now())
+  deletedAt   DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ledger  Ledger  @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
 }

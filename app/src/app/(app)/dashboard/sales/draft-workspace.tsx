@@ -27,7 +27,7 @@ export function DraftWorkspace({
   canCreate,
   hasFiscalYear,
 }: {
-  kind: "QUOTATION" | "SALES_ORDER";
+  kind: "QUOTATION" | "SALES_ORDER" | "PROFORMA_INVOICE";
   title: string;
   endpoint: string; // "/api/sales/quotations"
   initial: List;

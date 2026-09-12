@@ -33,7 +33,7 @@ const baseDoc = {
 
 export const draftCreate = z
   .object({
-    type: z.enum(["QUOTATION", "SALES_ORDER"]),
+    type: z.enum(["QUOTATION", "SALES_ORDER", "PROFORMA_INVOICE"]),
     ...baseDoc,
   })
   .refine((v) => v.customerLedgerId || v.customerName, {

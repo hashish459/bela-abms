@@ -21,7 +21,7 @@ export function VoucherWorkspace({
   initial,
   canCreate,
 }: {
-  type: "JOURNAL" | "CONTRA";
+  type: "JOURNAL" | "CONTRA" | "EXPENSE";
   title: string;
   initial: List;
   canCreate: boolean;
@@ -115,7 +115,7 @@ function VoucherForm({
   onClose,
   onSaved,
 }: {
-  type: "JOURNAL" | "CONTRA";
+  type: "JOURNAL" | "CONTRA" | "EXPENSE";
   title: string;
   onClose: () => void;
   onSaved: () => void;

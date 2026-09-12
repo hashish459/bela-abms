@@ -33,6 +33,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/reports/budget/budget-vs-expense` | A · `reports.budget_reports` | Budget vs Expense Report | allocated vs actual (from live GL movement) per heading, with variance/utilization |
 | `/dashboard/accounts/charts-of-accounts` | A · `accounts.charts_of_accounts` | Chart of Accounts | collapsible AS/LI/EQ/IN/EX tree + Add Account |
 | `/dashboard/accounts/contacts` | A · `accounts.contacts` | Contacts | Customers / Suppliers tabs + contact form |
+| `/dashboard/accounts/cash-bank` | A · `accounts.cash_and_bank_account` | Cash & Bank Account | live-balance view of ledgers under the "CCE" account head (session 24) — reuses `trialBalance()`, no new model |
+| `/dashboard/accounts/balance-confirmation` | A · `accounts.balance_confirmation` | Balance Confirmation | point-in-time balance snapshot sent to a customer/supplier for confirmation (session 24) — status Pending/Confirmed/Disputed |
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
 | `/dashboard/vouchers/contra-voucher` | A · `vouchers.contra_voucher` | Contra Voucher | list + entry form (uses shared `voucher-workspace`) |
 | `/dashboard/vouchers/stock-journal` | A · `vouchers.stock_journal` | Stock Journal | list + entry form; posts GL value gain/loss (`COS-01-0003`) + stock movement, distinct from Inventory Adjustment (qty-only, no GL) |
@@ -79,6 +81,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
+| `/dashboard/inventory/warehouse-transfer` | A · `inventory.warehouse_transfer` | Warehouse Transfer | list + entry (session 24) — posts a real `TRANSFER_OUT`+`TRANSFER_IN` `StockMovement` pair per line, no GL |
+| `/dashboard/inventory/inventory-transfer` | A · `inventory.inventory_transfer` | Inventory Transfer | read-only, filterable ledger of every `StockMovement` (session 24, reinterpreted — see `Docs/DATABASE.md`) |
 | `/dashboard/reports/inventory/stock-summary` | A · `reports.inventory_reports` | Stock Summary | on-hand, low-stock flag |
 | `/dashboard/reports/inventory/batch-wise-stock-summary` | A · `reports.inventory_reports` | Batch Wise Stock Summary | on-hand per batch/lot; populated once a Purchase Invoice line records a batch number |
 | `/dashboard/reports/inventory/expiry-management` | A · `reports.inventory_reports` | Expiry Management | batches with stock on hand that are expired or expiring within 90 days |
@@ -88,11 +92,19 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
 | `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice) |
 | `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
+| `/dashboard/sales/proforma-invoice` | A · `sales.proforma_invoice` | Proforma Invoice | list + form + convert (session 24) — reuses `SalesDoc`/`<DraftWorkspace>` exactly like Quotation, no new model |
+| `/dashboard/sales/chalani` | A · `sales.chalani` | Chalani | dispatch/delivery register (session 24) — paperwork only, no GL/stock; optional link to a Sales Invoice |
+| `/dashboard/sales/cheque` | A · `sales.cheque` | Cheque | post-dated cheque register (session 24) — clearance status tracking, no GL posting |
+| `/dashboard/sales/receivable` | A · `sales.receivable_amount` | Receivable Amount | flat, actionable outstanding-invoice list (session 24) — reuses the same computation as Reports › Aging Report |
 | `/dashboard/purchase/purchase-order` | A · `purchase.purchase_order` | Purchase Order | list + form + convert |
 | `/dashboard/purchase/purchase-bills` | A · `purchase.purchase_invoice` | Purchase Invoice | list + form (excise/custom duty columns, immutability notice); rows click through to detail |
 | `/dashboard/purchase/purchase-bills/[id]` | A · `purchase.purchase_invoice` read | Purchase Invoice detail | printable letterhead + line items (landed amount) + totals |
+| `/dashboard/purchase/expenses` | A · `purchase.expenses` | Expenses | list + entry (session 24) — reuses `<VoucherWorkspace type="EXPENSE">`, same component as Journal/Contra Voucher |
+| `/dashboard/purchase/goods-received` | A · `purchase.goods_received` | Goods Received | GRN list + form, optionally prefilled from a Purchase Order (session 24) — no stock/GL impact |
 | `/dashboard/purchase/supplier-payment` | A · `purchase.payment` | Payments | list + payment form (against invoice) |
 | `/dashboard/purchase/debit-note` | A · `purchase.debit_notes` | Debit Notes | list + return form (pick invoice) |
+| `/dashboard/purchase/imports` | A · `purchase.imports` | Imports | customs/compliance tracking register (session 24) — optional link to a Purchase Invoice, no GL impact |
+| `/dashboard/purchase/payable` | A · `purchase.payable_amount` | Payable Amount | flat, actionable outstanding-invoice list (session 24) — mirrors Receivable Amount |
 | `/dashboard/:slug*` | A | `(app)/dashboard/[...slug]` | catch-all: permission-gated "not implemented" stub |
 
 ## Implemented — API
@@ -143,6 +155,9 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/accounts/vouchers` | A · `vouchers.journal_voucher\|contra_voucher` | `?type=JOURNAL\|CONTRA`; POST posts via `postVoucher` (ΣDr=ΣCr enforced) |
 | GET | `/api/accounts/vouchers/[id]` | A · `vouchers.journal_voucher` read | voucher detail with lines |
 | GET/POST | `/api/accounts/stock-journal` | A · `vouchers.stock_journal` | list / create — posts a GL voucher (value gain/loss against `COS-01-0003`) + a stock movement, unlike Inventory Adjustment which is qty-only |
+| GET/POST | `/api/accounts/vouchers` | A · adds `EXPENSE: "purchase.expenses"` to the `PERM` map | session 24: Purchase › Expenses reuses this exact endpoint with `?type=EXPENSE` — no new route |
+| GET/POST | `/api/accounts/balance-confirmation` | A · `accounts.balance_confirmation` | list / create — snapshots `trialBalance({asOf})` for one ledger at creation time (session 24). Cash & Bank Account has no API route of its own: its page calls `cashAndBankAccounts()` directly server-side |
+| PATCH | `/api/accounts/balance-confirmation/[id]` | A · `accounts.balance_confirmation` update | `{status}` only (Pending/Confirmed/Disputed) |
 | GET | `/api/reports/trial-balance` | A · `reports.accounting_reports` read | active FY; `?asOf=` |
 | GET | `/api/reports/ledger/[id]` | A · `reports.accounting_reports` read | running ledger statement |
 | GET/POST | `/api/inventory/categories` | A · `inventory.product_category` | list / create (self-nesting) |
@@ -155,6 +170,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
 | POST | `/api/inventory/products/[id]/barcode` | A · `inventory.product_item` update | claims the next `prefix+nextNumber` value from Settings › Barcode and assigns it to the product permanently; no-op if already assigned |
 | GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
+| GET/POST | `/api/inventory/warehouse-transfer` | A · `inventory.warehouse_transfer` | list / create (session 24) — posts a real `TRANSFER_OUT`+`TRANSFER_IN` pair per line, no GL |
+| GET | `/api/inventory/stock-movements` | A · `inventory.inventory_transfer` read | filterable `?productId&warehouseId&kind&from&to` (session 24) — every `StockMovement` row, the Inventory Transfer page's data source |
 | GET | `/api/reports/stock-summary` | A · `reports.inventory_reports` read | on-hand per product (Σ movements) |
 | GET | `/api/reports/batch-wise-stock-summary` | A · `reports.inventory_reports` read | `?search`; on-hand per batch/lot |
 | GET | `/api/reports/expiry-management` | A · `reports.inventory_reports` read | `?withinDays` (default 90); expired/near-expiry batches with stock |
@@ -175,6 +192,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/sales/docs/[id]/convert` | A · `sales.sales_invoice` create | quotation→order→invoice prefill |
 | GET/POST | `/api/sales/receipts` | A · `sales.receipt` | list / create (Dr cash / Cr customer; updates invoice status) |
 | GET/POST | `/api/sales/credit-notes` | A · `sales.credit_note` | list / create (stock IN + reverse GL + reverse COGS; capped at invoice value) |
+| GET/POST | `/api/sales/proforma-invoices` | A · `sales.proforma_invoice` | list / create (session 24) — same `SalesDoc`/`createDraft`/`draftCreate` as Quotation, `type: "PROFORMA_INVOICE"`, `PF-` number prefix |
+| GET/POST | `/api/sales/chalani` | A · `sales.chalani` | list / create (session 24) — paperwork register, no GL/stock, `CH-` number prefix |
+| GET/POST | `/api/sales/cheque` | A · `sales.cheque` | list / create (session 24) — cheque register, no GL posting |
+| PATCH | `/api/sales/cheque/[id]` | A · `sales.cheque` update | `{status}` only (Pending/Deposited/Cleared/Bounced) |
+| GET | `/api/sales/receivables` | A · `sales.receivable_amount` read | `?search` — flat outstanding-invoice list (session 24) |
 | POST | `/api/purchase/calc` | A · `purchase.purchase_invoice` read | preview totals (excise/custom duty capitalized) |
 | GET/POST | `/api/purchase/orders` | A · `purchase.purchase_order` | list / create (no GL/stock) |
 | GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **financial fields are immutable, no edit/delete**); POST body's optional `customFields` (module `PURCHASE_INVOICE`) saved at creation only |
@@ -182,6 +204,9 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
 | GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
 | GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |
+| GET/POST | `/api/purchase/goods-received` | A · `purchase.goods_received` | list / create (session 24) — GRN, no stock/GL impact, `GRN-` number prefix |
+| GET/POST | `/api/purchase/imports` | A · `purchase.imports` | list / create (session 24) — customs/compliance register, no GL impact, `IMP-` number prefix |
+| GET | `/api/purchase/payables` | A · `purchase.payable_amount` read | `?search` — flat outstanding-invoice list (session 24), mirrors `/api/sales/receivables` |
 | GET | `/api/system/info` | A · `system.system_info` read | process/host/DB latency/network + per-module record counts |
 | POST | `/api/system/query` | A · `system.database_console` read | read-only diagnostic SQL (SELECT/WITH only, 200-row cap, audited) |
 | GET/POST | `/api/assets` | A · `fixed_assets.asset_register` | list / create (posts Dr Asset-at-cost / Cr Supplier-or-Cash-Bank) |

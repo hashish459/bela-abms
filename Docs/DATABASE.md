@@ -266,6 +266,50 @@ year — so a real Journal Voucher posted against "Office Rent" immediately show
 spend against an "Office Rent Budget" heading with zero extra wiring. Manual headings report
 `actual: null` rather than a fabricated zero, since there's genuinely nothing to compute.
 
+### Sales/Purchase/Inventory/Accounts stub menu items — ✅ BUILT (session 24)
+A full menu audit found 19 seeded-but-unbuilt nav items; 12 "scattered stub" items across
+four otherwise-complete modules were built this session (CRM, Store Builder, Token, and
+Documents — four *entire* unbuilt modules — were explicitly out of scope, along with
+Printing Cost Register, a print-shop industry-vertical feature with no fit for a
+manufacturing company). **Deliberate exception to this doc's own closing rule** ("only add
+an entity once its behaviour is observed in the reference app"): none of these 12 have any
+field-level or workflow documentation anywhere in this project's discovery notes
+(`Docs/DISCOVERY-LOG.md` itself lists them "not yet inspected") — built anyway on explicit
+instruction, using standard accounting/Nepali-business-practice interpretations, with every
+judgment call flagged in a schema comment rather than presented as a verified clone.
+
+Two reused existing infrastructure with no new model: **Proforma Invoice** just adds
+`PROFORMA_INVOICE` to `SalesDocType` (same non-GL-posting draft pattern as `QUOTATION`/
+`SALES_ORDER`, reusing `createDraft`/`convertDoc`); **Expenses** just wires the
+already-unused `VoucherType.EXPENSE` (present in the schema/prefix map since the platform
+foundation, never actually posted anywhere until now) into the same generic
+`createVoucher()`/`<VoucherWorkspace>` Journal/Contra Voucher already use. **Receivable
+Amount**/**Payable Amount** and **Cash & Bank Account** are read-only views with no new
+model either — `listReceivables()`/`listPayables()` (`src/server/sales/service.ts` /
+`src/server/purchase/service.ts`) are a flat, per-invoice, actionable variant of
+`receivablesAging()`/`payablesAging()`'s per-party bucketed totals; `cashAndBankAccounts()`
+(`src/server/accounts/service.ts`) is `trialBalance()`'s existing rows filtered to the "CCE"
+account head.
+
+| Model | Notes |
+|---|---|
+| **`Chalani`** / **`ChalaniItem`** | dispatch/delivery register (Sales › Chalani) — a Nepali business term for an outward goods-dispatch note. Pure paperwork: no GL or stock impact, since the Sales Invoice already owns both; optional `salesDocId` link, `vehicleNo`/`driverName` for the physical dispatch |
+| **`Cheque`** | post-dated cheque register (Sales › Cheque) — tracks the physical instrument's clearance status (`PENDING → DEPOSITED → CLEARED`/`BOUNCED`). `PaymentMode.CHEQUE` already existed for the GL side of a cheque payment; this is the non-financial register of the instrument itself, not a second posting of the same money |
+| **`GoodsReceipt`** / **`GoodsReceiptItem`** | Goods Received Note (Purchase › Goods Received) — records what was physically counted in against a Purchase Order, before the supplier's invoice arrives. Deliberately posts no stock or GL: `createPurchaseInvoice()` still owns both, so a GRN can never double-count what the invoice already books; optional `qtyOrdered` vs. required `qtyReceived` for the discrepancy check |
+| **`ImportShipment`** | customs/compliance register (Purchase › Imports) — the linked Purchase Invoice's line items already carry customs/excise duty for landed-cost valuation; this is a compliance-side record on top of that (bill of entry, country of origin, port), not a second purchase-posting path |
+| **`WarehouseTransfer`** / **`WarehouseTransferItem`** | inter-warehouse stock move (Inventory › Warehouse Transfer) — an actual physical movement, so unlike the three registers above it DOES post real `StockMovement` rows (a `TRANSFER_OUT` + `TRANSFER_IN` pair per line, via the existing `postStockMovement()`). No GL and no unit cost tracked, matching `InventoryAdjustment`'s existing precedent: a transfer changes where stock sits, never its value |
+| **`BalanceConfirmation`** | point-in-time balance snapshot (Accounts › Balance Confirmation) sent to a customer/supplier for confirmation — standard audit/reconciliation practice. Computed live from `trialBalance({asOf})` at creation time then frozen into the record; never repostable, since it's a statement about a balance, not a transaction |
+
+**Key design point — Inventory Transfer was reinterpreted, not built as specified.** Nothing
+in this project's docs distinguishes "Warehouse Transfer" from "Inventory Transfer" as two
+separate menu items, and this app's own UI convention (list + create-modal on one page)
+means a second transfer-creation screen would just duplicate Warehouse Transfer's own
+history list. Reinterpreted "Inventory Transfer" as `stockMovementLedger()`
+(`src/server/inventory/stock.ts`) — a read-only, filterable view of *every* `StockMovement`
+row across every kind (purchases, sales, adjustments, transfers, manufacturing), a
+system-wide movement ledger that didn't exist anywhere before. No new model — it queries the
+existing `StockMovement` table directly.
+
 ### Industry verticals  ⚠️ backend supports; likely feature-flagged
 `workshop job card` · `workshop technician` (auto/repair) · `restaurant table` · `token entry`
 (fuel dealer) · `paper roll register` / `printing cost register` (press/printing).

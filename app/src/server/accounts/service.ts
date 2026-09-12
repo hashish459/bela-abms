@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
-import { postVoucher, postOpeningBalance, nextNumber } from "./gl";
+import { postVoucher, postOpeningBalance, nextNumber, trialBalance } from "./gl";
 import { postStockMovement } from "@/server/inventory/stock";
 import {
   getCustomFieldValuesForEntities,
@@ -56,6 +56,23 @@ export async function chartOfAccounts(companyId: string) {
       })),
     })),
   }));
+}
+
+/** Cash/bank ledgers with a live balance (Accounts › Cash & Bank Account) —
+ * a filtered, balance-annotated view of the ledgers under the "CCE" account
+ * head, reusing trialBalance()'s own debit/credit computation rather than a
+ * second one. Distinct from Settings › Bank Detail, which manages the
+ * company's own registered bank accounts (routing/account numbers), not the
+ * GL ledgers themselves. */
+export async function cashAndBankAccounts(companyId: string, fiscalYearId: string | null) {
+  if (!fiscalYearId) return [];
+  const tb = await trialBalance(companyId, fiscalYearId);
+  return tb.allRows
+    .filter((r) => r.headCode === "CCE")
+    .map((r) => ({
+      ledgerId: r.ledgerId, code: r.code, name: r.name, groupName: r.groupName,
+      balance: r.closing, balanceType: r.closingType,
+    }));
 }
 
 export async function listGroups(companyId: string) {
@@ -448,7 +465,7 @@ async function ledgerId(tx: Prisma.TransactionClient, companyId: string, code: s
 export async function listVouchers(
   companyId: string,
   fiscalYearId: string | null,
-  type: "JOURNAL" | "CONTRA" | "STOCK",
+  type: "JOURNAL" | "CONTRA" | "STOCK" | "EXPENSE",
   opts: { page?: number; pageSize?: number; search?: string } = {},
 ) {
   const page = Math.max(1, opts.page ?? 1);

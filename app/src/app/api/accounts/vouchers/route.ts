@@ -7,12 +7,13 @@ import { createVoucher, listVouchers } from "@/server/accounts/service";
 const PERM: Record<string, string> = {
   JOURNAL: "vouchers.journal_voucher",
   CONTRA: "vouchers.contra_voucher",
+  EXPENSE: "purchase.expenses",
 };
 
-function voucherType(raw: string | null): "JOURNAL" | "CONTRA" {
+function voucherType(raw: string | null): "JOURNAL" | "CONTRA" | "EXPENSE" {
   const t = (raw ?? "JOURNAL").toUpperCase();
-  if (t !== "JOURNAL" && t !== "CONTRA")
-    throw errors.badRequest("type must be JOURNAL or CONTRA");
+  if (t !== "JOURNAL" && t !== "CONTRA" && t !== "EXPENSE")
+    throw errors.badRequest("type must be JOURNAL, CONTRA or EXPENSE");
   return t;
 }
 
