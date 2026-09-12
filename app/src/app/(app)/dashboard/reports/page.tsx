@@ -101,7 +101,7 @@ export default async function ReportsPage() {
       key: "budget",
       name: "Budget",
       perm: "reports.budget_reports",
-      reports: [{ title: "Budget vs Expense Report", href: null, gapReason: "Needs the Budget module (Budget Heading, Budget, Allocation, Fund) to be built first" }],
+      reports: [{ title: "Budget vs Expense Report", href: "/dashboard/reports/budget/budget-vs-expense" }],
     },
   ];
 

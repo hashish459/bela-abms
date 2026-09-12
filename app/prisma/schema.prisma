@@ -61,6 +61,9 @@ model Company {
   invoiceSetting         InvoiceSetting?
   invoiceImportTemplates InvoiceImportTemplate[]
   billFooterSetting      BillFooterSetting?
+  budgetHeadings         BudgetHeading[]
+  budgetFunds            BudgetFund[]
+  budgets                Budget[]
 }
 
 model Branch {
@@ -101,6 +104,7 @@ model FiscalYear {
   depreciationRuns DepreciationRun[]
   productionOrders ProductionOrder[]
   jobCards         JobCard[]
+  budgets          Budget[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -384,9 +388,10 @@ model AccountGroup {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  accountHead AccountHead @relation(fields: [accountHeadId], references: [id], onDelete: Cascade)
-  ledgers     Ledger[]
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountHead    AccountHead     @relation(fields: [accountHeadId], references: [id], onDelete: Cascade)
+  ledgers        Ledger[]
+  budgetHeadings BudgetHeading[]
 
   @@unique([companyId, code])
   @@index([accountHeadId])
@@ -1526,4 +1531,85 @@ model BillFooterSetting {
 
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+}
+
+/// ──────────────────────────────  BUDGET  ──────────────────────────────
+/// Standard operating-budget model (not the NGO donor-fund style the
+/// reference app's "Budget" group name suggests — Bela is a manufacturing
+/// company, so `BudgetFund` here means an internal funding source for a
+/// capex/expansion budget, e.g. "Term Loan — NIC Bank", not a grant donor).
+
+/// A budgetable line item. Either tied to a real chart-of-accounts group
+/// (`COA_GROUP` — actual spend is computed automatically from GL movement) or
+/// a free-text `MANUAL` line with no ledger tie (no automatic actual/variance).
+model BudgetHeading {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  sourceType     String    @default("MANUAL") // MANUAL | COA_GROUP
+  accountGroupId String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime?
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  accountGroup AccountGroup?      @relation(fields: [accountGroupId], references: [id], onDelete: SetNull)
+  allocations  BudgetAllocation[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+/// Internal funding source a capex/expansion budget draws on.
+model BudgetFund {
+  id        String    @id @default(cuid())
+  companyId String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  budgets Budget[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+/// One budget container per fiscal year (or a named revision within one) —
+/// the thing Allocations are entered against.
+model Budget {
+  id           String    @id @default(cuid())
+  companyId    String
+  fiscalYearId String
+  name         String
+  fundId       String?
+  notes        String?
+  isActive     Boolean   @default(true)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear  FiscalYear         @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  fund        BudgetFund?        @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  allocations BudgetAllocation[]
+
+  @@unique([companyId, fiscalYearId, name])
+  @@index([companyId])
+}
+
+/// The budgeted amount for one heading within one budget — annual total (no
+/// monthly breakdown in this MVP).
+model BudgetAllocation {
+  id              String  @id @default(cuid())
+  budgetId        String
+  budgetHeadingId String
+  amount          Decimal @default(0) @db.Decimal(18, 2)
+
+  budget        Budget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budgetHeading BudgetHeading @relation(fields: [budgetHeadingId], references: [id], onDelete: Restrict)
+
+  @@unique([budgetId, budgetHeadingId])
+  @@index([budgetHeadingId])
 }

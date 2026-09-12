@@ -13,6 +13,56 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 21 — 2026-09-12 (Budget module — the last Reports catalogue gap)
+Client explicitly asked to continue with the Budget module next. This was the one remaining
+gap-card that couldn't be closed by discovering existing-but-unwired plumbing (unlike
+Batch/Custom Status/Barcode in session 20) — the reference app's "Budget" group is genuinely
+NGO/project-fund accounting (a `budget fund` is a grant donor, per `Docs/DATABASE.md`'s
+reference-inventory notes), which doesn't fit Bela's business at all. Reinterpreted rather
+than copied: `BudgetFund` here is an **internal** funding source (e.g. "Term Loan — NIC
+Bank", "Retained Earnings") for a capex/operating budget, not a donor; there's no `project`
+model since project-restricted-fund accounting isn't relevant to a manufacturing company.
+Four new models (migration `20260912082437_budget_module`, applied cleanly with plain
+`prisma migrate dev` since these are brand-new tables, not new constraints on existing data
+— no non-interactive workaround needed this time): `BudgetHeading`, `BudgetFund`, `Budget`,
+`BudgetAllocation`.
+
+**Key design point — actual spend is computed, not entered.** A `BudgetHeading` is either
+`MANUAL` (free-text, no automatic actual) or `COA_GROUP` (linked to a real `AccountGroup`).
+`budgetVsExpenseReport()` in `src/server/budget/service.ts` computes "actual" for a
+COA_GROUP heading exactly the way `profitAndLoss()` already does — sums `VoucherLine`
+debit−credit across every ledger in that group, scoped to the budget's fiscal year — so
+allocating Rs. 300,000 to an "Office Rent Budget" heading linked to the Rent Expenses group
+immediately shows the real Rs. 25,000 Journal Voucher posted in an earlier session as actual
+spend, 8.3% utilization, with zero extra wiring. A MANUAL heading reports `actual: null`
+(not a fabricated zero) since there's genuinely nothing to compute — same "don't fake a
+number you can't back up" principle as everywhere else this session.
+
+Built all 4 tabs the sidebar's pre-seeded (previously dead) "Budget" nav item already
+pointed at — `/dashboard/budget/{budget-heading,budget,allocation,fund}` — plus
+`/dashboard/reports/budget/budget-vs-expense`, now linked live from the Reports catalogue
+instead of its gap-card. Allocation is its own tab/permission module (`budget.allocation`,
+distinct from `budget.budget`) matching the reference's own module split — a budget's
+container (name, fiscal year, fund) and its per-heading amounts are edited in different
+places by potentially different roles.
+
+Verified live end-to-end with real data, not fixtures: created a COA-linked "Office Rent
+Budget" heading against the real Rent Expenses (ADE-19) account group, a "Retained Earnings"
+fund, a "FY 2083-84 Operating Budget" container, allocated Rs. 300,000 to the heading, and
+confirmed the Budget vs Expense Report correctly pulled Rs. 25,000 actual from the
+pre-existing Journal Voucher with correct variance (275,000) and utilization (8.3%) —
+without creating any new GL entries to fake the number. Left this data in place as genuine
+starter configuration (same judgment as the Nabil Bank example in session 19), not test
+noise to clean up. `npm run typecheck`, `npx eslint src` (one `react-hooks/set-state-in-effect`
+fix, same `setTimeout` wrapper pattern as every other report view), and a clean
+`rm -rf .next && npm run build` all pass.
+
+**Every documented Reports catalogue gap from session 18 is now closed** (Batch/Expiry in
+session 20, Budget vs Expense here) except Annex 13/5, which remains correctly blocked on
+the missing official IRD spec. Remaining open items are all from the Settings-sub-page MVP
+scoping in session 19: Custom Fields still has no dynamic form wiring, EAN13 barcode
+rendering (session 20), Invoice Import Setting's CSV upload/parse execution.
+
 ### Session 20 — 2026-09-12 (Batch/expiry tracking + Custom Status wiring + real Barcode rendering)
 Client asked to "continue remaining tasks... enterprise level... today's company standards"
 with no specific list, so this session worked from the two honestly-flagged gaps left in the

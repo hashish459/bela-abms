@@ -244,9 +244,26 @@ payable, not a receivable) even though the setting is shared.
 `crm client` · `crm partner` · `crm contract` · `crm follow up` · `crm interaction` ·
 `crm target` · `visit history` · `location point` (field-sales GPS).
 
-### Budget (NGO / project-fund oriented)
-`budget heading` (parent, source Manual|COA-GL, restricted flag) · `budget` · `budget allocation`
-· `budget fund` (donor) · `project`.
+### Budget — ✅ BUILT (session 20, standard operating budget, not NGO donor-fund)
+The reference app models this as NGO/project-fund accounting (`budget fund` = external
+donor). Bela is a manufacturing company, so it was reinterpreted as a standard capex/
+operating budget: `BudgetFund` = an *internal* funding source (e.g. "Term Loan — NIC Bank",
+"Retained Earnings") rather than a grant donor; there's no `project` model since project-fund
+restriction accounting doesn't apply here.
+
+| Model | Notes |
+|---|---|
+| **`BudgetHeading`** | budgetable line item; `sourceType` `MANUAL` (free-text, no GL tie, no automatic actual) or `COA_GROUP` (`accountGroupId→AccountGroup` — actual spend computed live from that group's ledgers' GL movement) |
+| **`BudgetFund`** | master list of internal funding sources |
+| **`Budget`** | one container per fiscal year (`fiscalYearId→FiscalYear`), optionally tagged with a `BudgetFund` |
+| **`BudgetAllocation`** | the budgeted amount for one heading within one budget (annual total, no monthly breakdown in this MVP); `@@unique([budgetId, budgetHeadingId])` |
+
+**Key design point:** `budgetVsExpenseReport()` (`src/server/budget/service.ts`) computes
+"actual" the same way `profitAndLoss()` does — `VoucherLine` movement (debit − credit)
+across every ledger in the heading's linked `AccountGroup`, scoped to the budget's fiscal
+year — so a real Journal Voucher posted against "Office Rent" immediately shows up as actual
+spend against an "Office Rent Budget" heading with zero extra wiring. Manual headings report
+`actual: null` rather than a fabricated zero, since there's genuinely nothing to compute.
 
 ### Industry verticals  ⚠️ backend supports; likely feature-flagged
 `workshop job card` · `workshop technician` (auto/repair) · `restaurant table` · `token entry`

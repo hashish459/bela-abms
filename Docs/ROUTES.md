@@ -26,6 +26,11 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/signin-security` | A · `settings.signin_and_security` | Signin & Security | change password (self-service, no permission gate) + active `RefreshToken` sessions with revoke |
 | `/dashboard/settings/tour` | A · `settings.tour` | Tour | static first-time-setup checklist linking into the app |
 | `/dashboard/settings/*` (other) | A | wrapped by `settings/layout.tsx` sub-nav | fall through to stub until built |
+| `/dashboard/budget/budget-heading` | A · `budget.budget_heading` | Budget Heading | budgetable line items; MANUAL or COA_GROUP-linked |
+| `/dashboard/budget/budget` | A · `budget.budget` | Budget | one container per fiscal year; links to Allocation |
+| `/dashboard/budget/allocation` | A · `budget.allocation` | Allocation | `?budgetId=` picks the budget; editable amount per heading |
+| `/dashboard/budget/fund` | A · `budget.fund` | Fund | internal funding-source master list (term loan, retained earnings, …) |
+| `/dashboard/reports/budget/budget-vs-expense` | A · `reports.budget_reports` | Budget vs Expense Report | allocated vs actual (from live GL movement) per heading, with variance/utilization |
 | `/dashboard/accounts/charts-of-accounts` | A · `accounts.charts_of_accounts` | Chart of Accounts | collapsible AS/LI/EQ/IN/EX tree + Add Account |
 | `/dashboard/accounts/contacts` | A · `accounts.contacts` | Contacts | Customers / Suppliers tabs + contact form |
 | `/dashboard/vouchers/journal-voucher` | A · `vouchers.journal_voucher` | Journal Voucher | list + double-entry entry form |
@@ -153,6 +158,14 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/reports/batch-wise-stock-summary` | A · `reports.inventory_reports` read | `?search`; on-hand per batch/lot |
 | GET | `/api/reports/expiry-management` | A · `reports.inventory_reports` read | `?withinDays` (default 90); expired/near-expiry batches with stock |
 | GET | `/api/inventory/batches` | A · `inventory.product_item` read | `?productId&warehouseId` (warehouse defaults to the company's default); feeds the Sales line editor's batch picker, FEFO-sorted |
+| GET/POST | `/api/budget/headings` | A · `budget.budget_heading` | list / create budget headings |
+| PATCH/DELETE | `/api/budget/headings/[id]` | A · `budget.budget_heading` update/delete | delete blocked while it has allocations |
+| GET/POST | `/api/budget/funds` | A · `budget.fund` | list / create funding sources |
+| PATCH/DELETE | `/api/budget/funds/[id]` | A · `budget.fund` update/delete | delete blocked while assigned to a budget |
+| GET/POST | `/api/budget/budgets` | A · `budget.budget` | list / create budgets |
+| PATCH/DELETE | `/api/budget/budgets/[id]` | A · `budget.budget` update/delete | |
+| GET/PUT | `/api/budget/budgets/[id]/allocations` | A · `budget.allocation` | GET: every active heading with its current amount (0 if unset). PUT: bulk upsert `{allocations: [{budgetHeadingId, amount}]}` |
+| GET | `/api/reports/budget-vs-expense` | A · `reports.budget_reports` read | `?budgetId`; allocated vs actual (live GL movement) per heading, `actual: null` for MANUAL headings |
 | POST | `/api/sales/calc` | A · `sales.sales_invoice` read | preview totals (same engine as the write) |
 | GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **financial fields are immutable, no edit/delete**) |
 | GET/PATCH | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read/update | GET: detail with items + receipts. PATCH: `{customStatusId}` only — the Custom Status tag, the one editable field on an otherwise-immutable invoice |
