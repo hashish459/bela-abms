@@ -600,6 +600,7 @@ model Product {
   sku          String
   reorderPoint Decimal?    @db.Decimal(18, 3)
   description  String?
+  barcodeValue String? // claimed once from BarcodeSetting's prefix+nextNumber counter; printable as CODE128
 
   // Units — up to 3 levels. subUnitConversion = # of sub-units per 1 primary unit
   // (Docs/ASSUMPTIONS.md). tertiaryConversion = # of tertiary per 1 sub-unit.
@@ -640,6 +641,7 @@ model Product {
   stockMovements StockMovement[]
 
   @@unique([companyId, sku])
+  @@unique([companyId, barcodeValue])
   @@index([companyId, kind])
   @@index([companyId, categoryId])
 }

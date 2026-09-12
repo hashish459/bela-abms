@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { Barcode, Plus, Search } from "lucide-react";
 import {
   api, Button, Card, EmptyState, Field, Input, Modal, PageHeader, inputClass, toast,
 } from "@/components/ui";
@@ -11,6 +12,7 @@ type Kind = "GOODS" | "SERVICE" | "EXPENSE";
 type Row = {
   id: string; sku: string; name: string; kind: Kind; category: string | null;
   unit: string; sellingPrice: string; purchasePrice: string; tax: string; onHand: string | null;
+  barcodeValue: string | null;
 };
 type List = { rows: Row[]; total: number; page: number; pageSize: number };
 type Opt = { id: string; name: string };
@@ -107,6 +109,7 @@ export function ProductsWorkspace({
                 <th className="px-4 py-2 text-right font-medium">Selling</th>
                 <th className="px-4 py-2 font-medium">Tax</th>
                 {kind === "GOODS" && <th className="px-4 py-2 text-right font-medium">On hand</th>}
+                {kind === "GOODS" && <th className="px-4 py-2 font-medium">Barcode</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -121,6 +124,16 @@ export function ProductsWorkspace({
                   {kind === "GOODS" && (
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {p.onHand} {p.unit}
+                    </td>
+                  )}
+                  {kind === "GOODS" && (
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/dashboard/inventory/products/${p.id}/barcode`}
+                        className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                      >
+                        <Barcode size={13} /> {p.barcodeValue ?? "Generate"}
+                      </Link>
                     </td>
                   )}
                 </tr>

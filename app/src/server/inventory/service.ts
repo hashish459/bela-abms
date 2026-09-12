@@ -207,6 +207,7 @@ export async function listProducts(
         unit: { select: { shortName: true } },
         taxRate: { select: { name: true, ratePct: true } },
         isNonTaxable: true,
+        barcodeValue: true,
       },
     }),
     db.product.count({ where }),
@@ -235,6 +236,7 @@ export async function listProducts(
       purchasePrice: r.purchasePrice.toFixed(2),
       tax: r.isNonTaxable ? "Non-taxable" : r.taxRate?.name ?? "—",
       onHand: r.kind === "GOODS" ? (qtyById.get(r.id) ?? D(0)).toFixed(3) : null,
+      barcodeValue: r.barcodeValue,
     })),
     total,
     page,
@@ -368,6 +370,32 @@ export async function updateProduct(
   });
   await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "Product", entityId: id });
   return updated;
+}
+
+/** Claims the next barcode value from Settings › Barcode's prefix+counter and
+ * assigns it to the product permanently (re-calling this on an already-tagged
+ * product is a no-op — it returns the existing value rather than burning
+ * another number). Increments BarcodeSetting.nextNumber atomically. */
+export async function generateProductBarcode(companyId: string, actorId: string, productId: string) {
+  return db.$transaction(async (tx) => {
+    const product = await tx.product.findFirst({ where: { id: productId, companyId, deletedAt: null } });
+    if (!product) throw errors.notFound("Product not found");
+    if (product.barcodeValue) return product;
+
+    const setting = await tx.barcodeSetting.upsert({
+      where: { companyId },
+      create: { companyId },
+      update: {},
+    });
+    const value = `${setting.prefix ?? ""}${String(setting.nextNumber).padStart(6, "0")}`;
+
+    const [updated] = await Promise.all([
+      tx.product.update({ where: { id: productId }, data: { barcodeValue: value } }),
+      tx.barcodeSetting.update({ where: { companyId }, data: { nextNumber: setting.nextNumber + 1 } }),
+    ]);
+    await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "Product", entityId: productId, meta: { barcodeValue: value } });
+    return updated;
+  });
 }
 
 /* ───────────────────────  Inventory adjustment  ──────────────────── */

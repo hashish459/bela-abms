@@ -69,7 +69,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/workshop/job-card` | A · `workshop.job_card` | Job Card | list + intake form (optional estimate) + Complete & Bill + Cancel |
 | `/dashboard/workshop/technician` | A · `workshop.technician` | Technician | list + add/edit form |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
-| `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product |
+| `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product; Goods rows link to a Barcode column |
+| `/dashboard/inventory/products/[id]/barcode` | A · `inventory.product_item` | Barcode Label | generate a barcode value + printable Code128 label sized per Settings › Barcode |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
@@ -146,6 +147,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | PATCH | `/api/inventory/warehouses/[id]` | A · `inventory.warehouse` update | edit |
 | GET/POST | `/api/inventory/products` | A · `inventory.product_item` | `?kind=GOODS\|SERVICE\|EXPENSE&search&page`; POST optionally posts OPENING stock |
 | GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
+| POST | `/api/inventory/products/[id]/barcode` | A · `inventory.product_item` update | claims the next `prefix+nextNumber` value from Settings › Barcode and assigns it to the product permanently; no-op if already assigned |
 | GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
 | GET | `/api/reports/stock-summary` | A · `reports.inventory_reports` read | on-hand per product (Σ movements) |
 | GET | `/api/reports/batch-wise-stock-summary` | A · `reports.inventory_reports` read | `?search`; on-hand per batch/lot |

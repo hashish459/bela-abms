@@ -13,7 +13,7 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
-### Session 20 — 2026-09-12 (Batch/expiry tracking + Custom Status wiring)
+### Session 20 — 2026-09-12 (Batch/expiry tracking + Custom Status wiring + real Barcode rendering)
 Client asked to "continue remaining tasks... enterprise level... today's company standards"
 with no specific list, so this session worked from the two honestly-flagged gaps left in the
 Reports catalogue (session 18): Batch Wise Stock Summary and Expiry Management, both
@@ -75,11 +75,41 @@ no business on what the customer/supplier receives. Verified live: created a "Re
 Dispatch" SALES_INVOICE status, assigned it to a real invoice, reloaded the page fresh, and
 confirmed it persisted.
 
-Still-open documented gaps (unchanged from session 18/19, still deliberately not built):
-Annex 13/5 (no official IRD spec), Budget module + Budget vs Expense Report (module doesn't
-exist), Custom Fields dynamic wiring into entry forms, Barcode symbol rendering, Invoice
-Import Setting's CSV upload/parse execution. These are reasonable candidates for a following
-session under the same "continue remaining tasks" instruction.
+**Same session, third item — real Barcode rendering.** Settings › Barcode (session 19) was
+configuration with nothing reading it. Built an actual Code128B encoder from scratch in
+`src/lib/barcode.ts` (~100 lines, the standard ISO/IEC 15417 pattern table, no npm
+dependency) — verified the table's structural integrity by checking all 106 data patterns
+sum to 11 modules and STOP sums to 13, since there's no physical scanner in this environment
+to test against. `Product.barcodeValue` (new nullable column, `@@unique([companyId,
+barcodeValue])`, migration `20260912080500_product_barcode_value`) is claimed once via
+`generateProductBarcode()` from the setting's `prefix + nextNumber` counter (atomically
+incremented, re-calling it on an already-tagged product is a no-op) and rendered as a real
+scannable-looking SVG barcode on a new printable label page
+(`/dashboard/inventory/products/[id]/barcode`), sized per the setting's label width/height
+and honoring its show-name/show-price toggles. The Products list gained a Barcode column
+(Goods only) linking straight to it. **Honesty note:** the setting's other symbology option,
+EAN13, has no encoder — the label page detects `symbology === "EAN13"` and shows an
+on-screen (never printed) warning that it's rendering Code128 instead of silently mislabeling
+the output.
+
+Migration note: `prisma migrate dev` refused to run non-interactively for either schema
+change this session (it wants an interactive confirmation before adding a `@@unique`
+constraint, even one only nullable columns are involved in). Worked around it with
+`prisma migrate diff --script` to get the exact SQL, hand-wrote the migration file, and
+applied it with `prisma migrate deploy` (non-interactive by design) — same end state as
+`migrate dev`, just without the prompt this environment can't answer.
+
+Verified live: generated a barcode for a real product ("A4 Paper Ream" → 000001), saw a
+correctly-formed varying-width barcode with the value printed underneath, name and price
+shown per settings, and confirmed the value persisted back on the Products list after
+navigating away and back.
+
+Still-open documented gaps: Annex 13/5 (no official IRD spec, session 18); Budget module +
+Budget vs Expense Report (module doesn't exist, session 19); Custom Fields dynamic wiring
+into entry forms (session 19); EAN13 barcode rendering (session 20, flagged on-screen
+rather than silently wrong); Invoice Import Setting's CSV upload/parse execution (session
+19). These are reasonable candidates for a following session under the same "continue
+remaining tasks" instruction.
 
 ### Session 19 — 2026-09-12 (The 12 remaining Settings sub-pages)
 Closed out the client's oldest still-open ask (first raised in session 17, deferred behind
