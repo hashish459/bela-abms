@@ -27,6 +27,7 @@ export const contactCreate = z.object({
   creditLimit: z.coerce.number().min(0).optional(),
   openingBalance: z.coerce.number().min(0).default(0),
   openingType: z.enum(["DR", "CR"]).default("DR"),
+  customFields: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
 });
 export const contactUpdate = contactCreate.partial();
 

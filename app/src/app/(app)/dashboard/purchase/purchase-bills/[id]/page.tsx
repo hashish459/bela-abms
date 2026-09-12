@@ -61,6 +61,7 @@ export default async function PurchaseInvoiceDetailPage({
           landedAmount: it.landedAmount.toFixed(2),
           lineVat: it.lineVat.toFixed(2),
         })),
+        customFieldValues: doc.customFieldValues,
       }}
       company={company}
       invoiceSetting={invoiceSetting}

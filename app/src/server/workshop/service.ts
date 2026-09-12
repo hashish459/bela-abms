@@ -5,6 +5,13 @@ import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { nextNumber } from "@/server/accounts/gl";
 import { createInvoice } from "@/server/sales/service";
+import {
+  getCustomFieldValuesForEntities,
+  getCustomFieldValuesForEntity,
+  prepareCustomFieldValues,
+  saveCustomFieldValues,
+  summarizeCustomFields,
+} from "@/server/custom-fields/service";
 import type { TechnicianCreate, JobCardCreate, JobCardBill } from "./schemas";
 
 const D = (n: Prisma.Decimal.Value) => new Prisma.Decimal(n);
@@ -71,6 +78,8 @@ export async function createJobCard(companyId: string, fiscalYearId: string, act
       }
     }
 
+    const customFieldValues = await prepareCustomFieldValues(companyId, "JOB_CARD", input.customFields, tx);
+
     const fy = await tx.fiscalYear.findUnique({ where: { id: fiscalYearId }, select: { name: true } });
     const seq = await nextNumber(tx, companyId, fiscalYearId, "workshop:JOB_CARD");
     const number = `JC-${fy!.name.replace("-", "/")}-${String(seq).padStart(4, "0")}`;
@@ -93,6 +102,8 @@ export async function createJobCard(companyId: string, fiscalYearId: string, act
       include: { items: true },
     });
 
+    if (customFieldValues.length) await saveCustomFieldValues(tx, companyId, jobCard.id, customFieldValues);
+
     await writeAudit({ userId: actorId, companyId, action: "CREATE", entity: "JobCard", entityId: jobCard.id, meta: { number, vehicleRegNo: input.vehicleRegNo } });
     return { id: jobCard.id, number: jobCard.number };
   });
@@ -104,12 +115,14 @@ export async function listJobCards(companyId: string, fiscalYearId: string | nul
     orderBy: [{ date: "desc" }, { number: "desc" }],
     include: { items: { select: { qty: true, rate: true, discount: true } } },
   });
+  const customByJobCard = await getCustomFieldValuesForEntities(companyId, "JOB_CARD", jobCards.map((jc) => jc.id));
   return jobCards.map((jc) => ({
     id: jc.id, number: jc.number, date: jc.date.toISOString().slice(0, 10),
     customerName: jc.customerName ?? "—", vehicleRegNo: jc.vehicleRegNo,
     vehicleMake: jc.vehicleMake, vehicleModel: jc.vehicleModel, complaint: jc.complaint,
     status: jc.status, invoiceId: jc.invoiceId,
     estimateTotal: itemsTotal(jc.items.map((i) => ({ qty: Number(i.qty), rate: Number(i.rate), discount: Number(i.discount) }))).toFixed(2),
+    customFieldsSummary: summarizeCustomFields(customByJobCard.get(jc.id)),
   }));
 }
 
@@ -141,6 +154,7 @@ export async function getJobCard(companyId: string, id: string) {
       description: it.description, qty: it.qty.toFixed(3), rate: it.rate.toFixed(2), discount: it.discount.toFixed(2),
     })),
     estimateTotal: itemsTotal(jc.items.map((i) => ({ qty: Number(i.qty), rate: Number(i.rate), discount: Number(i.discount) }))).toFixed(2),
+    customFieldValues: await getCustomFieldValuesForEntity(companyId, "JOB_CARD", jc.id),
   };
 }
 

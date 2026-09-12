@@ -36,8 +36,8 @@ export function CustomFieldsManager({
         action={canCreate && <Button onClick={() => setCreating(true)}><Plus size={15} /> Add field</Button>}
       />
       <p className="mb-3 text-sm text-muted">
-        User-definable fields per module. Definitions only for now — entry forms don&apos;t yet
-        render these dynamically (tracked as a follow-on).
+        User-definable fields per module. Active fields render automatically on that
+        module&apos;s entry form and are saved with the record.
       </p>
 
       {initial.length === 0 ? (

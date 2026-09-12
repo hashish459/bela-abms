@@ -56,6 +56,7 @@ model Company {
   banks                  Bank[]
   bankAccounts           BankAccount[]
   customFields           CustomField[]
+  customFieldValues      CustomFieldValue[]
   customStatuses         CustomStatus[]
   barcodeSetting         BarcodeSetting?
   invoiceSetting         InvoiceSetting?
@@ -1440,7 +1441,8 @@ model CustomField {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  values  CustomFieldValue[]
 
   @@index([companyId, module])
 }
@@ -1612,4 +1614,25 @@ model BudgetAllocation {
 
   @@unique([budgetId, budgetHeadingId])
   @@index([budgetHeadingId])
+}
+
+/// The value a `CustomField` definition takes on one specific record.
+/// `entityId` is intentionally not a real FK — this table is polymorphic
+/// across whichever entity the field's `module` names (SalesDoc, PurchaseDoc,
+/// Product, Ledger-as-contact, JobCard), so there's no single table to point
+/// at. Orphaned rows (entity later deleted) are just invisible metadata, not
+/// a data-integrity risk to anything else.
+model CustomFieldValue {
+  id            String   @id @default(cuid())
+  companyId     String
+  customFieldId String
+  entityId      String
+  value         String?
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+  @@index([companyId, entityId])
 }

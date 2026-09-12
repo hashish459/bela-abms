@@ -5,6 +5,7 @@ import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { postVoucher, nextNumber, formatVoucherNumber } from "@/server/accounts/gl";
 import { postStockMovement, resolveOrCreateBatch } from "@/server/inventory/stock";
+import { getCustomFieldValuesForEntity, prepareCustomFieldValues, saveCustomFieldValues } from "@/server/custom-fields/service";
 import { calcPurchaseTotals, type PurchaseCalcLineInput } from "./calc";
 import type {
   DebitNoteCreate,
@@ -171,6 +172,8 @@ export async function createPurchaseInvoice(
     if (D(totals.grandTotal).lte(0))
       throw errors.validation(null, "Invoice total must be greater than zero");
 
+    const customFieldValues = await prepareCustomFieldValues(companyId, "PURCHASE_INVOICE", input.customFields, tx);
+
     const seq = await nextNumber(tx, companyId, fiscalYearId, "purchase:INVOICE");
     const number = formatVoucherNumber("PURCHASE", fy.name, seq); // PU-2083/84-0001
 
@@ -317,6 +320,8 @@ export async function createPurchaseInvoice(
         },
       });
     }
+
+    if (customFieldValues.length) await saveCustomFieldValues(tx, companyId, doc.id, customFieldValues);
 
     const finalDoc = await tx.purchaseDoc.update({ where: { id: doc.id }, data: { voucherId: purchaseVoucher.id } });
 
@@ -579,7 +584,8 @@ export async function getPurchaseDoc(companyId: string, id: string) {
     },
   });
   if (!d) throw errors.notFound("Document not found");
-  return d;
+  const customFieldValues = await getCustomFieldValuesForEntity(companyId, "PURCHASE_INVOICE", d.id);
+  return { ...d, customFieldValues };
 }
 
 /** Set/clear the doc's descriptive Custom Status tag (Settings › Custom Status). Purely

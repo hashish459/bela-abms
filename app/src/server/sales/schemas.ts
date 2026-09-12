@@ -28,6 +28,7 @@ const baseDoc = {
   notes: z.string().max(1000).optional().or(z.literal("")),
   invoiceDiscount: z.coerce.number().min(0).default(0),
   lines: z.array(docLine).min(1),
+  customFields: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
 };
 
 export const draftCreate = z

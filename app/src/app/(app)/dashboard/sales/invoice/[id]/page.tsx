@@ -58,6 +58,7 @@ export default async function SalesInvoiceDetailPage({
           netAmount: it.netAmount.toFixed(2),
           lineVat: it.lineVat.toFixed(2),
         })),
+        customFieldValues: doc.customFieldValues,
       }}
       company={company}
       invoiceSetting={invoiceSetting}

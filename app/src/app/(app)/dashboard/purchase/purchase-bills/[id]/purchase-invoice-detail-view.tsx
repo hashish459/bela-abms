@@ -7,6 +7,7 @@ import { PrintButton } from "@/components/print-button";
 import { PrintLetterhead } from "@/components/print-letterhead";
 import { PrintBillFooter } from "@/components/print-bill-footer";
 import { StatusTagPicker, type StatusTag, type StatusTagOption } from "@/components/status-tag-picker";
+import { CustomFieldsDisplay } from "@/components/custom-fields-fields";
 import { adToBs } from "@/lib/bs-date";
 
 type Item = {
@@ -14,6 +15,7 @@ type Item = {
   qty: string; rate: string; discount: string; taxRatePct: string;
   landedAmount: string; lineVat: string;
 };
+type CustomFieldValue = { id: string; label: string; fieldType: string; value: string | null };
 type Doc = {
   id: string; number: string; date: string; type: string;
   supplierName: string | null; supplierPan: string | null; supplierInvoiceNumber: string | null;
@@ -23,6 +25,7 @@ type Doc = {
   nonTaxableTotal: string; taxableTotal: string; vatAmount: string;
   grandTotal: string; amountPaid: string; fiscalYearName: string;
   items: Item[];
+  customFieldValues: CustomFieldValue[];
 };
 type Company = {
   legalName: string; displayName: string | null;
@@ -171,6 +174,10 @@ export function PurchaseInvoiceDetailView({
         </div>
 
         {doc.notes && <p className="mt-4 text-xs text-muted">{doc.notes}</p>}
+
+        <div className="mt-4">
+          <CustomFieldsDisplay values={doc.customFieldValues} />
+        </div>
 
         <PrintBillFooter
           terms={billFooter?.termsAndConditions ?? null}

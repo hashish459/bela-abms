@@ -7,12 +7,14 @@ import { Barcode, Plus, Search } from "lucide-react";
 import {
   api, Button, Card, EmptyState, Field, Input, Modal, PageHeader, inputClass, toast,
 } from "@/components/ui";
+import { CustomFieldsFields } from "@/components/custom-fields-fields";
 
 type Kind = "GOODS" | "SERVICE" | "EXPENSE";
 type Row = {
   id: string; sku: string; name: string; kind: Kind; category: string | null;
   unit: string; sellingPrice: string; purchasePrice: string; tax: string; onHand: string | null;
   barcodeValue: string | null;
+  customFieldsSummary: string | null;
 };
 type List = { rows: Row[]; total: number; page: number; pageSize: number };
 type Opt = { id: string; name: string };
@@ -110,6 +112,7 @@ export function ProductsWorkspace({
                 <th className="px-4 py-2 font-medium">Tax</th>
                 {kind === "GOODS" && <th className="px-4 py-2 text-right font-medium">On hand</th>}
                 {kind === "GOODS" && <th className="px-4 py-2 font-medium">Barcode</th>}
+                <th className="px-4 py-2 font-medium">Custom Fields</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -136,6 +139,9 @@ export function ProductsWorkspace({
                       </Link>
                     </td>
                   )}
+                  <td className="max-w-56 truncate px-4 py-2.5 text-xs text-muted" title={p.customFieldsSummary ?? undefined}>
+                    {p.customFieldsSummary ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -194,6 +200,7 @@ function ProductForm({
     size: "", color: "", flavour: "",
     openingQty: "", openingWarehouseId: warehouses.find(Boolean)?.id ?? "",
   });
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF((s) => ({ ...s, [k]: e.target.value }));
@@ -210,6 +217,7 @@ function ProductForm({
         purchasePrice: Number(f.purchasePrice) || 0,
         sellingPrice: Number(f.sellingPrice) || 0,
         openingQty: kind === "GOODS" && f.openingQty ? Number(f.openingQty) : undefined,
+        customFields,
       }),
     });
     setSaving(false);
@@ -360,6 +368,13 @@ function ProductForm({
             <Field label="Flavour"><Input value={f.flavour} onChange={set("flavour")} /></Field>
           </div>
         </section>
+
+        <CustomFieldsFields
+          module="PRODUCT"
+          values={customFields}
+          onChange={(id, v) => setCustomFields((s) => ({ ...s, [id]: v }))}
+          gridClassName="grid gap-3 sm:grid-cols-3"
+        />
       </div>
 
       <div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">

@@ -5,6 +5,12 @@ import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { postVoucher, postOpeningBalance, nextNumber } from "./gl";
 import { postStockMovement } from "@/server/inventory/stock";
+import {
+  getCustomFieldValuesForEntities,
+  prepareCustomFieldValues,
+  saveCustomFieldValues,
+  summarizeCustomFields,
+} from "@/server/custom-fields/service";
 import type { ContactCreate, LedgerCreate, VoucherCreate, StockJournalCreate } from "./schemas";
 
 const D = (n: Prisma.Decimal.Value) => new Prisma.Decimal(n);
@@ -230,10 +236,12 @@ export async function listContacts(
       address: true, creditLimit: true, openingBalance: true, openingType: true, contactKind: true,
     },
   });
+  const customByContact = await getCustomFieldValuesForEntities(companyId, "CONTACT", rows.map((r) => r.id));
   return rows.map((r) => ({
     ...r,
     creditLimit: r.creditLimit?.toFixed(2) ?? null,
     openingBalance: r.openingBalance.toFixed(2),
+    customFieldsSummary: summarizeCustomFields(customByContact.get(r.id)),
   }));
 }
 
@@ -250,6 +258,8 @@ export async function createContact(
   return db.$transaction(async (tx) => {
     const group = await tx.accountGroup.findFirst({ where: { companyId, code: groupCode } });
     if (!group) throw errors.validation(null, "Parent ledger group not found");
+
+    const customFieldValues = await prepareCustomFieldValues(companyId, "CONTACT", input.customFields, tx);
 
     const code = await allocateLedgerCode(companyId, group.code, tx);
     const opening = new Prisma.Decimal(input.openingBalance ?? 0);
@@ -283,6 +293,8 @@ export async function createContact(
         amount: opening, type: input.openingType ?? "DR", createdById: actorId,
       });
     }
+
+    if (customFieldValues.length) await saveCustomFieldValues(tx, companyId, created.id, customFieldValues);
 
     await writeAudit({
       userId: actorId, companyId, action: "CREATE", entity: "Contact", entityId: created.id,

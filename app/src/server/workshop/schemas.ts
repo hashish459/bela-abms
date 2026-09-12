@@ -37,6 +37,7 @@ export const jobCardCreate = z
     complaint: z.string().min(1, "Describe the complaint / work requested").max(500),
     notes: z.string().max(1000).optional().or(z.literal("")),
     items: z.array(jobCardItem).default([]),
+    customFields: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
   })
   .refine((v) => v.customerLedgerId || v.customerName, {
     message: "Select a customer or enter a walk-in name",

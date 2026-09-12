@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { postVoucher, nextNumber, formatVoucherNumber } from "@/server/accounts/gl";
 import { postStockMovement } from "@/server/inventory/stock";
 import { weightedAverageCost } from "@/server/inventory/cost";
+import { getCustomFieldValuesForEntity, prepareCustomFieldValues, saveCustomFieldValues } from "@/server/custom-fields/service";
 import { calcSalesTotals, type CalcLineInput } from "./calc";
 import type {
   CreditNoteCreate,
@@ -200,6 +201,8 @@ export async function createInvoice(
     });
     if (!fy) throw errors.badRequest("Invalid fiscal year");
     if (fy.isClosed) throw errors.badRequest("Fiscal year is closed");
+
+    const customFieldValues = await prepareCustomFieldValues(companyId, "SALES_INVOICE", input.customFields, tx);
 
     const calcLines = await buildCalcLines(tx, companyId, input.lines);
     const totals = calcSalesTotals(calcLines, input.invoiceDiscount ?? 0);
@@ -396,6 +399,8 @@ export async function createInvoice(
         data: { status: "CONVERTED" },
       });
     }
+
+    if (customFieldValues.length) await saveCustomFieldValues(tx, companyId, doc.id, customFieldValues);
 
     await writeAudit({
       userId: actorId, companyId, action: "CREATE", entity: "SalesInvoice", entityId: doc.id,
@@ -700,7 +705,8 @@ export async function getSalesDoc(companyId: string, id: string) {
     },
   });
   if (!d) throw errors.notFound("Document not found");
-  return d;
+  const customFieldValues = await getCustomFieldValuesForEntity(companyId, "SALES_INVOICE", d.id);
+  return { ...d, customFieldValues };
 }
 
 /** Set/clear the doc's descriptive Custom Status tag (Settings › Custom Status). Purely

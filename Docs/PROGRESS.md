@@ -13,6 +13,62 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 22 — 2026-09-12 (Custom Fields — dynamic form wiring)
+Client explicitly asked to continue with Custom Fields' dynamic form wiring next — the one
+documented gap left over from session 19 (`CustomField` definitions existed but were never
+rendered into an entry form or persisted as a value). New `CustomFieldValue` model
+(migration `20260912090157_custom_field_values`, applied cleanly with plain `prisma migrate
+dev` — a brand-new table, no workaround needed): `companyId`, `customFieldId→CustomField`,
+`entityId`, `value` (`String?`), `@@unique([customFieldId, entityId])`.
+
+**Key design point — `entityId` is deliberately not a real FK.** A value has to attach to
+whichever table its field's `module` names — `SalesDoc`, `PurchaseDoc`, `Product`,
+`Ledger`-as-contact, or `JobCard` — five structurally unrelated tables, so there's no single
+column to point a real foreign key at. Accepted the trade-off explicitly (documented in a
+schema comment): the app layer scopes every read/write by `module` + `companyId`, and an
+orphaned row after its entity is deleted is just invisible metadata, never a
+referential-integrity problem for anything else.
+
+Centralized all the logic in `src/server/custom-fields/service.ts`: `prepareCustomFieldValues()`
+validates required-ness against active definitions *before* the entity is created inside a
+transaction (so a missing-required-field error can't leave a half-created record), and
+`saveCustomFieldValues()` persists *after*, once the new `entityId` exists.
+`getCustomFieldValuesForEntity()`/`getCustomFieldValuesForEntities()` (singular/batch, the
+latter for list pages) merge values back onto reads, and `summarizeCustomFields()` renders a
+compact `"Label: Value, Label2: Value2"` string for the two modules (Product, Contact) with
+no existing detail page. `GET /api/custom-fields?module=X` — gated only on being signed in
+with a company, deliberately *not* on `settings.custom_fields` (that permission governs
+managing definitions, not using them while filling out an invoice) — feeds a new
+`<CustomFieldsFields>` component that every entry form renders unconditionally; it fetches
+its own definitions and returns `null` outright (heading included) when a module has zero
+active fields, so no caller needs to special-case the empty state. `<CustomFieldsDisplay>` is
+its read-only counterpart.
+
+Wired into all five modules the brief's `MODULES` list already named: **Product** and
+**Contact** show values as the compact summarized list column (no detail page exists for
+either); **Job Card** shows them in its existing detail modal; **Sales Invoice** and
+**Purchase Invoice** show them on their existing detail/print pages, with values captured
+only at creation — matching the pre-existing immutable-once-posted convention for both
+invoice types (no edit/update path was added, since none exists for anything else on those
+records either).
+
+Verified live end-to-end for all five, not just typecheck: defined one real field per module
+via Settings › Custom Fields (a required TEXT on Sales Invoice, a SELECT with options on
+Product, a NUMBER on Contact, a CHECKBOX on Job Card, an optional TEXT on Purchase Invoice),
+then created a real record through each entry form. Confirmed the required-field check
+actually rejects an empty submission server-side (`422` + `"PO Reference" is required` toast)
+before re-filling and saving successfully, and confirmed every value survives a page
+reload on its display surface (list column for Product/Contact, detail modal for Job Card,
+detail page for both invoice types). `npm run typecheck`, `npx eslint src` (one
+`@next/next/no-assign-module-variable` fix — renamed a local `module` variable in the new
+route handler, since Next.js reserves that name in its CommonJS module scope), and a clean
+`rm -rf .next && npm run build` all pass.
+
+**Every documented gap from session 19/20 is now closed except two**: EAN13 barcode
+rendering (session 20 — only Code128 actually renders) and Invoice Import Setting's CSV
+upload/parse pipeline (session 19 — mapping-only). Both remain correctly flagged rather than
+silently faked.
+
 ### Session 21 — 2026-09-12 (Budget module — the last Reports catalogue gap)
 Client explicitly asked to continue with the Budget module next. This was the one remaining
 gap-card that couldn't be closed by discovering existing-but-unwired plumbing (unlike

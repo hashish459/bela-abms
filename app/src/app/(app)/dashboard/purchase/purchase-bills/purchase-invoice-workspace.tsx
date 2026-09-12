@@ -10,6 +10,7 @@ import {
   PurchaseLineEditor, newPurchaseLine, type PurchaseEditorLine, type PurchaseTotals,
 } from "@/components/purchase-line-editor";
 import type { TaxOpt } from "@/components/sales-line-editor";
+import { CustomFieldsFields } from "@/components/custom-fields-fields";
 import { adToBs } from "@/lib/bs-date";
 
 type Row = {
@@ -132,6 +133,7 @@ function PurchaseInvoiceForm({
   const [invoiceDiscount, setInvoiceDiscount] = useState("0");
   const [lines, setLines] = useState<PurchaseEditorLine[]>([newPurchaseLine()]);
   const [totals, setTotals] = useState<PurchaseTotals | null>(null);
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const isCash = paymentMode !== "CREDIT";
@@ -161,6 +163,7 @@ function PurchaseInvoiceForm({
         paymentLedgerId: isCash ? paymentLedgerId : undefined,
         referenceNo: referenceNo || undefined, notes: notes || undefined,
         invoiceDiscount: Number(invoiceDiscount) || 0, lines: payloadLines,
+        customFields,
       }),
     });
     setSaving(false);
@@ -219,6 +222,12 @@ function PurchaseInvoiceForm({
         <Field label="Note">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+
+        <CustomFieldsFields
+          module="PURCHASE_INVOICE"
+          values={customFields}
+          onChange={(id, v) => setCustomFields((s) => ({ ...s, [id]: v }))}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">

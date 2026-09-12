@@ -9,6 +9,7 @@ import {
 import {
   SalesLineEditor, newLine, type EditorLine, type TaxOpt, type Totals,
 } from "@/components/sales-line-editor";
+import { CustomFieldsFields } from "@/components/custom-fields-fields";
 import { adToBs } from "@/lib/bs-date";
 
 type Row = {
@@ -154,6 +155,7 @@ function InvoiceForm({
   const [invoiceDiscount, setInvoiceDiscount] = useState("0");
   const [lines, setLines] = useState<EditorLine[]>([newLine()]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const isCash = paymentMode !== "CREDIT";
@@ -192,6 +194,7 @@ function InvoiceForm({
         notes: notes || undefined,
         invoiceDiscount: Number(invoiceDiscount) || 0,
         lines: payloadLines,
+        customFields,
       }),
     });
     setSaving(false);
@@ -264,6 +267,12 @@ function InvoiceForm({
         <Field label="Note (appears on print)">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+
+        <CustomFieldsFields
+          module="SALES_INVOICE"
+          values={customFields}
+          onChange={(id, v) => setCustomFields((s) => ({ ...s, [id]: v }))}
+        />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">

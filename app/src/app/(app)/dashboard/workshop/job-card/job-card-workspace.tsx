@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { api, Button, Card, EmptyState, Field, Input, Modal, PageHeader, inputClass, toast } from "@/components/ui";
+import { CustomFieldsFields, CustomFieldsDisplay } from "@/components/custom-fields-fields";
 import { adToBs } from "@/lib/bs-date";
 
 type Row = {
@@ -230,6 +231,7 @@ function JobCardForm({
   const [complaint, setComplaint] = useState("");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<ItemRow[]>([]);
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -244,7 +246,7 @@ function JobCardForm({
         date, customerLedgerId: customerLedgerId || undefined, customerName: customerName || undefined,
         customerPhone: customerPhone || undefined, vehicleRegNo, vehicleMake: vehicleMake || undefined,
         vehicleModel: vehicleModel || undefined, odometerReading: odometerReading ? Number(odometerReading) : undefined,
-        complaint, notes: notes || undefined, items: itemsPayload(rows),
+        complaint, notes: notes || undefined, items: itemsPayload(rows), customFields,
       }),
     });
     setSaving(false);
@@ -302,6 +304,12 @@ function JobCardForm({
         <Field label="Notes">
           <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+
+        <CustomFieldsFields
+          module="JOB_CARD"
+          values={customFields}
+          onChange={(id, v) => setCustomFields((s) => ({ ...s, [id]: v }))}
+        />
       </div>
       <div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
         <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -392,6 +400,7 @@ type Detail = {
   vehicleRegNo: string; vehicleMake: string | null; vehicleModel: string | null; odometerReading: string | null;
   complaint: string; notes: string | null; status: string; estimateTotal: string; invoiceId: string | null;
   items: { id: string; itemType: string; productName: string | null; technicianName: string | null; description: string; qty: string; rate: string; discount: string }[];
+  customFieldValues: { id: string; label: string; fieldType: string; value: string | null }[];
 };
 
 function JobCardDetail({ id, onClose }: { id: string; onClose: () => void }) {
@@ -423,6 +432,8 @@ function JobCardDetail({ id, onClose }: { id: string; onClose: () => void }) {
             <div><p className="text-xs text-muted">Estimate</p><p className="font-medium tabular-nums">Rs. {data.estimateTotal}</p></div>
           </div>
           <div><p className="text-xs text-muted">Complaint</p><p className="text-sm">{data.complaint}</p></div>
+
+          <CustomFieldsDisplay values={data.customFieldValues} />
 
           {data.status === "BILLED" && data.invoiceId && (
             <Card className="p-3 text-sm">

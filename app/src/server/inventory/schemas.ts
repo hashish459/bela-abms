@@ -57,6 +57,8 @@ export const productCreate = z.object({
   // Opening stock (GOODS only)
   openingQty: z.coerce.number().min(0).optional(),
   openingWarehouseId: z.string().optional().or(z.literal("")),
+
+  customFields: z.record(z.string(), z.union([z.string(), z.boolean()])).optional(),
 });
 export const productUpdate = productCreate.partial();
 

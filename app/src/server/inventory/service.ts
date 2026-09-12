@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
 import { postStockMovement, nextNumber } from "./stock";
+import {
+  getCustomFieldValuesForEntities,
+  prepareCustomFieldValues,
+  saveCustomFieldValues,
+  summarizeCustomFields,
+} from "@/server/custom-fields/service";
 import type {
   AdjustmentCreate,
   ProductCreate,
@@ -223,6 +229,7 @@ export async function listProducts(
       })
     : [];
   const qtyById = new Map(moves.map((m) => [m.productId, D(m._sum.qty ?? 0)]));
+  const customByProduct = await getCustomFieldValuesForEntities(companyId, "PRODUCT", rows.map((r) => r.id));
 
   return {
     rows: rows.map((r) => ({
@@ -237,6 +244,7 @@ export async function listProducts(
       tax: r.isNonTaxable ? "Non-taxable" : r.taxRate?.name ?? "—",
       onHand: r.kind === "GOODS" ? (qtyById.get(r.id) ?? D(0)).toFixed(3) : null,
       barcodeValue: r.barcodeValue,
+      customFieldsSummary: summarizeCustomFields(customByProduct.get(r.id)),
     })),
     total,
     page,
@@ -255,6 +263,8 @@ export async function createProduct(
       where: { companyId, sku: input.sku, deletedAt: null },
     });
     if (dup) throw errors.conflict(`SKU "${input.sku}" is already used`);
+
+    const customFieldValues = await prepareCustomFieldValues(companyId, "PRODUCT", input.customFields, tx);
 
     const product = await tx.product.create({
       data: {
@@ -316,6 +326,8 @@ export async function createProduct(
         ],
       });
     }
+
+    if (customFieldValues.length) await saveCustomFieldValues(tx, companyId, product.id, customFieldValues);
 
     await writeAudit({
       userId: actorId, companyId, action: "CREATE", entity: "Product", entityId: product.id,

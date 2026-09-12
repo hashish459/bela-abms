@@ -18,7 +18,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/bank-detail` | A · `settings.bank_detail` | Bank Detail | company's own bank accounts; default one feeds Bill Footer |
 | `/dashboard/settings/bill-footer` | A · `settings.bill_footer` | Bill Footer | terms, bank account, signatory, note — printed on Sales/Purchase invoice detail+print pages |
 | `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
-| `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module (MVP — not yet rendered into entry forms) |
+| `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module — active fields render dynamically on that module's entry form (session 22) |
 | `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
 | `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config (no renderer wired yet) |
 | `/dashboard/settings/invoice-import-setting` | A · `settings.invoice_import_setting` | Invoice Import Setting | CSV column-mapping templates (MVP — upload/parse pipeline is a follow-on) |
@@ -125,6 +125,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | PATCH/DELETE | `/api/settings/bank-accounts/[id]` | A · `settings.bank_detail` update/delete | setting `isDefault` clears it on all others |
 | GET/POST | `/api/settings/custom-fields` | A · `settings.custom_fields` view/create | UDF definitions |
 | PATCH/DELETE | `/api/settings/custom-fields/[id]` | A · `settings.custom_fields` update/delete | |
+| GET | `/api/custom-fields?module=X` | any signed-in user with a company (not gated on `settings.custom_fields` — that permission governs managing definitions, not using them) | active field definitions for one module, read by every entry form's `<CustomFieldsFields>` |
 | GET/POST | `/api/settings/custom-status` | A · `settings.custom_status` view/create | descriptive per-module status labels |
 | PATCH/DELETE | `/api/settings/custom-status/[id]` | A · `settings.custom_status` update/delete | |
 | GET/PUT | `/api/settings/barcode` | A · `settings.barcode` view/update | singleton `BarcodeSetting` |
@@ -137,7 +138,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/accounts/groups` | A · `accounts.charts_of_accounts` read | flat group list for pickers |
 | GET/POST | `/api/accounts/ledgers` | A · `accounts.charts_of_accounts` read/create | ledger search (`?search&groups&heads&contactKind`) / create (auto-code, opening → OPENING voucher) |
 | PATCH/DELETE | `/api/accounts/ledgers/[id]` | A · `accounts.charts_of_accounts` update/delete | edit / soft-delete (blocked if used, system rows locked) |
-| GET/POST | `/api/accounts/contacts` | A · `accounts.contacts` read/create | `?kind=CUSTOMER\|SUPPLIER`; create under TRR-01/TRP-01 |
+| GET/POST | `/api/accounts/contacts` | A · `accounts.contacts` read/create | `?kind=CUSTOMER\|SUPPLIER`; create under TRR-01/TRP-01; POST body's optional `customFields` (module `CONTACT`) saved alongside |
 | PATCH | `/api/accounts/contacts/[id]` | A · `accounts.contacts` update | edit contact |
 | GET/POST | `/api/accounts/vouchers` | A · `vouchers.journal_voucher\|contra_voucher` | `?type=JOURNAL\|CONTRA`; POST posts via `postVoucher` (ΣDr=ΣCr enforced) |
 | GET | `/api/accounts/vouchers/[id]` | A · `vouchers.journal_voucher` read | voucher detail with lines |
@@ -150,7 +151,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | PATCH | `/api/inventory/units/[id]` | A · `inventory.units_of_measurement` update | edit |
 | GET/POST | `/api/inventory/warehouses` | A · `inventory.warehouse` | list / create (first = default) |
 | PATCH | `/api/inventory/warehouses/[id]` | A · `inventory.warehouse` update | edit |
-| GET/POST | `/api/inventory/products` | A · `inventory.product_item` | `?kind=GOODS\|SERVICE\|EXPENSE&search&page`; POST optionally posts OPENING stock |
+| GET/POST | `/api/inventory/products` | A · `inventory.product_item` | `?kind=GOODS\|SERVICE\|EXPENSE&search&page`; POST optionally posts OPENING stock; POST body's optional `customFields` (module `PRODUCT`) saved alongside, summarized as a list column |
 | GET/PATCH | `/api/inventory/products/[id]` | A · `inventory.product_item` | detail / edit |
 | POST | `/api/inventory/products/[id]/barcode` | A · `inventory.product_item` update | claims the next `prefix+nextNumber` value from Settings › Barcode and assigns it to the product permanently; no-op if already assigned |
 | GET/POST | `/api/inventory/adjustments` | A · `inventory.inventory_adjustment` | list / create (posts ADJUSTMENT_IN/OUT movements, `ADJ-00001`) |
@@ -167,7 +168,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/PUT | `/api/budget/budgets/[id]/allocations` | A · `budget.allocation` | GET: every active heading with its current amount (0 if unset). PUT: bulk upsert `{allocations: [{budgetHeadingId, amount}]}` |
 | GET | `/api/reports/budget-vs-expense` | A · `reports.budget_reports` read | `?budgetId`; allocated vs actual (live GL movement) per heading, `actual: null` for MANUAL headings |
 | POST | `/api/sales/calc` | A · `sales.sales_invoice` read | preview totals (same engine as the write) |
-| GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **financial fields are immutable, no edit/delete**) |
+| GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **financial fields are immutable, no edit/delete**); POST body's optional `customFields` (module `SALES_INVOICE`) saved at creation only |
 | GET/PATCH | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read/update | GET: detail with items + receipts. PATCH: `{customStatusId}` only — the Custom Status tag, the one editable field on an otherwise-immutable invoice |
 | GET/POST | `/api/sales/quotations` | A · `sales.quotation` | list / create (no GL/stock) |
 | GET/POST | `/api/sales/orders` | A · `sales.sales_order` | list / create (no GL/stock) |
@@ -176,7 +177,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/sales/credit-notes` | A · `sales.credit_note` | list / create (stock IN + reverse GL + reverse COGS; capped at invoice value) |
 | POST | `/api/purchase/calc` | A · `purchase.purchase_invoice` read | preview totals (excise/custom duty capitalized) |
 | GET/POST | `/api/purchase/orders` | A · `purchase.purchase_order` | list / create (no GL/stock) |
-| GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **financial fields are immutable, no edit/delete**) |
+| GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **financial fields are immutable, no edit/delete**); POST body's optional `customFields` (module `PURCHASE_INVOICE`) saved at creation only |
 | GET/PATCH | `/api/purchase/invoices/[id]` | A · `purchase.purchase_invoice` read/update | GET: detail with items + payments. PATCH: `{customStatusId}` only — the Custom Status tag |
 | POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
 | GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
@@ -193,7 +194,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/manufacturing/production-orders/[id]` | A · `manufacturing.production_order` read | detail with components consumed |
 | GET/POST | `/api/workshop/technicians` | A · `workshop.technician` | list / create |
 | PATCH | `/api/workshop/technicians/[id]` | A · `workshop.technician` update | edit / deactivate |
-| GET/POST | `/api/workshop/job-cards` | A · `workshop.job_card` | list / open (no GL/stock — a working document) |
+| GET/POST | `/api/workshop/job-cards` | A · `workshop.job_card` | list / open (no GL/stock — a working document); POST body's optional `customFields` (module `JOB_CARD`) saved alongside, shown in the detail modal |
 | GET | `/api/workshop/job-cards/[id]` | A · `workshop.job_card` read | detail with intake-estimate items |
 | POST | `/api/workshop/job-cards/[id]/bill` | A · `workshop.job_card` update | completes the job by calling Sales' `createInvoice()` directly |
 | POST | `/api/workshop/job-cards/[id]/cancel` | A · `workshop.job_card` update | cancels an OPEN job card (no GL impact ever existed) |

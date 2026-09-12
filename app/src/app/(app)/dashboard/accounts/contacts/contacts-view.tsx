@@ -6,11 +6,13 @@ import { Plus } from "lucide-react";
 import {
   api, Button, Card, Field, Input, Modal, PageHeader, inputClass, toast,
 } from "@/components/ui";
+import { CustomFieldsFields } from "@/components/custom-fields-fields";
 
 type Contact = {
   id: string; code: string; name: string; panNumber: string | null;
   phone: string | null; email: string | null; address: string | null;
   creditLimit: string | null; openingBalance: string; openingType: string;
+  customFieldsSummary: string | null;
 };
 
 export function ContactsView({
@@ -64,12 +66,13 @@ export function ContactsView({
               <th className="px-4 py-2 font-medium">Phone</th>
               <th className="px-4 py-2 font-medium">Email</th>
               <th className="px-4 py-2 text-right font-medium">Opening</th>
+              <th className="px-4 py-2 font-medium">Custom Fields</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted">
+                <td colSpan={6} className="px-4 py-10 text-center text-muted">
                   No {tab.toLowerCase()}s yet.
                 </td>
               </tr>
@@ -85,6 +88,9 @@ export function ContactsView({
                 <td className="px-4 py-2.5 text-muted">{c.email || "—"}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">
                   {c.openingBalance} {c.openingType}
+                </td>
+                <td className="max-w-56 truncate px-4 py-2.5 text-xs text-muted" title={c.customFieldsSummary ?? undefined}>
+                  {c.customFieldsSummary ?? "—"}
                 </td>
               </tr>
             ))}
@@ -121,6 +127,7 @@ function ContactForm({
     bankName: "", bankAccount: "", creditLimit: "", openingBalance: "0",
   });
   const [openingType, setOpeningType] = useState<"DR" | "CR">("DR");
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((s) => ({ ...s, [k]: e.target.value }));
@@ -135,6 +142,7 @@ function ContactForm({
         creditLimit: f.creditLimit ? Number(f.creditLimit) : undefined,
         openingBalance: Number(f.openingBalance) || 0,
         openingType,
+        customFields,
       }),
     });
     setSaving(false);
@@ -213,6 +221,12 @@ function ContactForm({
             </select>
           </Field>
         </div>
+
+        <CustomFieldsFields
+          module="CONTACT"
+          values={customFields}
+          onChange={(id, v) => setCustomFields((s) => ({ ...s, [id]: v }))}
+        />
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onClose}>
