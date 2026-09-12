@@ -92,6 +92,10 @@ export const convertInput = z.object({
   toType: z.enum(["SALES_ORDER", "INVOICE"]),
 });
 
+export const setCustomStatusInput = z.object({
+  customStatusId: z.string().nullable(),
+});
+
 export type DraftCreate = z.infer<typeof draftCreate>;
 export type InvoiceCreate = z.infer<typeof invoiceCreate>;
 export type ReceiptCreate = z.infer<typeof receiptCreate>;

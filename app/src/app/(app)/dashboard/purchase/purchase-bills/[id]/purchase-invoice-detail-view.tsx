@@ -6,6 +6,7 @@ import { Button, Card, PageHeader } from "@/components/ui";
 import { PrintButton } from "@/components/print-button";
 import { PrintLetterhead } from "@/components/print-letterhead";
 import { PrintBillFooter } from "@/components/print-bill-footer";
+import { StatusTagPicker, type StatusTag, type StatusTagOption } from "@/components/status-tag-picker";
 import { adToBs } from "@/lib/bs-date";
 
 type Item = {
@@ -14,7 +15,7 @@ type Item = {
   landedAmount: string; lineVat: string;
 };
 type Doc = {
-  number: string; date: string; type: string;
+  id: string; number: string; date: string; type: string;
   supplierName: string | null; supplierPan: string | null; supplierInvoiceNumber: string | null;
   referenceNo: string | null; paymentMode: string; notes: string | null; status: string;
   subtotal: string; lineDiscountTotal: string; invoiceDiscount: string;
@@ -36,15 +37,24 @@ const DOC_LABEL: Record<string, string> = {
 };
 
 export function PurchaseInvoiceDetailView({
-  doc, company, invoiceSetting, billFooter,
-}: { doc: Doc; company: Company; invoiceSetting: InvoiceSetting; billFooter: BillFooter }) {
+  doc, company, invoiceSetting, billFooter, customStatus, availableStatuses, canTag,
+}: {
+  doc: Doc; company: Company; invoiceSetting: InvoiceSetting; billFooter: BillFooter;
+  customStatus: StatusTag; availableStatuses: StatusTagOption[]; canTag: boolean;
+}) {
   return (
     <>
       <PageHeader
         crumbs={["Purchase", "Purchase Invoice", doc.number]}
         title={doc.number}
         action={
-          <div className="flex gap-2" data-app-chrome>
+          <div className="flex items-center gap-2" data-app-chrome>
+            <StatusTagPicker
+              apiPath={`/api/purchase/invoices/${doc.id}`}
+              current={customStatus}
+              options={availableStatuses}
+              canEdit={canTag}
+            />
             <Link href="/dashboard/purchase/purchase-bills">
               <Button variant="outline">
                 <ArrowLeft size={14} /> Back

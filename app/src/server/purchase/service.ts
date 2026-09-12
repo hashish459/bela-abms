@@ -571,10 +571,37 @@ export async function listPurchaseDocs(
 export async function getPurchaseDoc(companyId: string, id: string) {
   const d = await db.purchaseDoc.findFirst({
     where: { id, companyId },
-    include: { items: { orderBy: { order: "asc" } }, payments: { select: { number: true, date: true, amount: true } }, fiscalYear: { select: { name: true } } },
+    include: {
+      items: { orderBy: { order: "asc" } },
+      payments: { select: { number: true, date: true, amount: true } },
+      fiscalYear: { select: { name: true } },
+      customStatus: { select: { id: true, label: true, color: true } },
+    },
   });
   if (!d) throw errors.notFound("Document not found");
   return d;
+}
+
+/** Set/clear the doc's descriptive Custom Status tag (Settings › Custom Status). Purely
+ * additive metadata — editable freely after creation, unlike every other invoice field. */
+export async function setPurchaseDocCustomStatus(
+  companyId: string,
+  actorId: string,
+  id: string,
+  customStatusId: string | null,
+) {
+  const doc = await db.purchaseDoc.findFirst({ where: { id, companyId }, select: { id: true } });
+  if (!doc) throw errors.notFound("Document not found");
+
+  if (customStatusId) {
+    const tag = await db.customStatus.findFirst({
+      where: { id: customStatusId, companyId, module: "PURCHASE_INVOICE", isActive: true },
+    });
+    if (!tag) throw errors.validation(null, "Invalid status tag");
+  }
+
+  await db.purchaseDoc.update({ where: { id }, data: { customStatusId } });
+  await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "PurchaseDoc", entityId: id, meta: { customStatusId } });
 }
 
 export async function convertPurchaseOrder(companyId: string, id: string) {

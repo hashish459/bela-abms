@@ -81,6 +81,10 @@ export const debitNoteCreate = z.object({
 
 export const convertInput = z.object({ toType: z.literal("INVOICE") });
 
+export const setCustomStatusInput = z.object({
+  customStatusId: z.string().nullable(),
+});
+
 export type PurchaseOrderCreate = z.infer<typeof purchaseOrderCreate>;
 export type PurchaseInvoiceCreate = z.infer<typeof purchaseInvoiceCreate>;
 export type SupplierPaymentCreate = z.infer<typeof supplierPaymentCreate>;

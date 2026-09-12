@@ -152,8 +152,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET | `/api/reports/expiry-management` | A · `reports.inventory_reports` read | `?withinDays` (default 90); expired/near-expiry batches with stock |
 | GET | `/api/inventory/batches` | A · `inventory.product_item` read | `?productId&warehouseId` (warehouse defaults to the company's default); feeds the Sales line editor's batch picker, FEFO-sorted |
 | POST | `/api/sales/calc` | A · `sales.sales_invoice` read | preview totals (same engine as the write) |
-| GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **immutable, no PATCH/DELETE**) |
-| GET | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read | invoice detail with items + receipts |
+| GET/POST | `/api/sales/invoices` | A · `sales.sales_invoice` | list / create (posts GL + stock + COGS; **financial fields are immutable, no edit/delete**) |
+| GET/PATCH | `/api/sales/invoices/[id]` | A · `sales.sales_invoice` read/update | GET: detail with items + receipts. PATCH: `{customStatusId}` only — the Custom Status tag, the one editable field on an otherwise-immutable invoice |
 | GET/POST | `/api/sales/quotations` | A · `sales.quotation` | list / create (no GL/stock) |
 | GET/POST | `/api/sales/orders` | A · `sales.sales_order` | list / create (no GL/stock) |
 | POST | `/api/sales/docs/[id]/convert` | A · `sales.sales_invoice` create | quotation→order→invoice prefill |
@@ -161,8 +161,8 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/POST | `/api/sales/credit-notes` | A · `sales.credit_note` | list / create (stock IN + reverse GL + reverse COGS; capped at invoice value) |
 | POST | `/api/purchase/calc` | A · `purchase.purchase_invoice` read | preview totals (excise/custom duty capitalized) |
 | GET/POST | `/api/purchase/orders` | A · `purchase.purchase_order` | list / create (no GL/stock) |
-| GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **immutable, no PATCH/DELETE**) |
-| GET | `/api/purchase/invoices/[id]` | A · `purchase.purchase_invoice` read | invoice detail with items + payments |
+| GET/POST | `/api/purchase/invoices` | A · `purchase.purchase_invoice` | list / create (posts GL + stock at landed cost; **financial fields are immutable, no edit/delete**) |
+| GET/PATCH | `/api/purchase/invoices/[id]` | A · `purchase.purchase_invoice` read/update | GET: detail with items + payments. PATCH: `{customStatusId}` only — the Custom Status tag |
 | POST | `/api/purchase/docs/[id]/convert` | A · `purchase.purchase_invoice` create | purchase order → invoice prefill |
 | GET/POST | `/api/purchase/payments` | A · `purchase.payment` | list / create (Dr supplier / Cr cash-bank; updates invoice status) |
 | GET/POST | `/api/purchase/debit-notes` | A · `purchase.debit_notes` | list / create (stock OUT + reverse GL at the debit note's own valuation; capped at invoice value) |

@@ -815,10 +815,15 @@ model SalesDoc {
   createdById   String?
   createdAt     DateTime       @default(now())
 
-  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fiscalYear FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
-  items      SalesDocItem[]
-  receipts   Receipt[]
+  // Descriptive tag from Settings › Custom Status (module "SALES_INVOICE") — purely
+  // additive metadata, editable any time; never drives GL/workflow logic like `status` does.
+  customStatusId String?
+
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear   FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  customStatus CustomStatus?  @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
+  items        SalesDocItem[]
+  receipts     Receipt[]
 
   @@unique([companyId, number])
   @@index([companyId, type, date])
@@ -946,10 +951,15 @@ model PurchaseDoc {
   createdById String?
   createdAt   DateTime          @default(now())
 
-  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fiscalYear FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
-  items      PurchaseDocItem[]
-  payments   SupplierPayment[]
+  // Descriptive tag from Settings › Custom Status (module "PURCHASE_INVOICE") — purely
+  // additive metadata, editable any time; never drives GL/workflow logic like `status` does.
+  customStatusId String?
+
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear   FiscalYear        @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  customStatus CustomStatus?     @relation(fields: [customStatusId], references: [id], onDelete: SetNull)
+  items        PurchaseDocItem[]
+  payments     SupplierPayment[]
 
   @@unique([companyId, number])
   @@index([companyId, type, date])
@@ -1443,7 +1453,9 @@ model CustomStatus {
   createdAt DateTime  @default(now())
   deletedAt DateTime?
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesDocs    SalesDoc[]
+  purchaseDocs PurchaseDoc[]
 
   @@index([companyId, module])
 }

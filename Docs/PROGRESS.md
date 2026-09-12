@@ -13,7 +13,7 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
-### Session 20 — 2026-09-12 (Batch/expiry tracking — closing the Reports catalogue gaps)
+### Session 20 — 2026-09-12 (Batch/expiry tracking + Custom Status wiring)
 Client asked to "continue remaining tasks... enterprise level... today's company standards"
 with no specific list, so this session worked from the two honestly-flagged gaps left in the
 Reports catalogue (session 18): Batch Wise Stock Summary and Expiry Management, both
@@ -59,11 +59,27 @@ offered exactly that lot with its live on-hand and expiry; sold part of it and c
 Batch Wise Stock Summary's on-hand dropped by exactly the sold quantity. `npm run
 typecheck`, `npx eslint src`, and a clean `rm -rf .next && npm run build` all pass.
 
+**Same session, second item — Custom Status wiring.** Session 19 built Custom Status as
+definitions-only (a label+color per module, nothing to attach it to). Closed that gap too:
+added a nullable `customStatusId` FK to both `SalesDoc` and `PurchaseDoc` (migration
+`20260912074027_doc_custom_status_tag`, `onDelete: SetNull`), plus a back-relation on
+`CustomStatus`. Unlike every other invoice field this one is genuinely mutable after
+creation — it carries no GL/workflow weight, so there's no immutability reason to lock it.
+`PATCH /api/sales/invoices/[id]` and `PATCH /api/purchase/invoices/[id]` accept
+`{customStatusId}` only (still permission-gated on `update`, still CSRF-checked via
+`guard()`) — every other field on those routes stays read-only, enforced by the route
+literally not accepting anything else. New shared `src/components/status-tag-picker.tsx`
+renders a colored dropdown (editable) or badge (read-only) on both invoice detail pages,
+wrapped in `data-app-chrome` so it never shows up on the printed copy — a workflow tag has
+no business on what the customer/supplier receives. Verified live: created a "Ready for
+Dispatch" SALES_INVOICE status, assigned it to a real invoice, reloaded the page fresh, and
+confirmed it persisted.
+
 Still-open documented gaps (unchanged from session 18/19, still deliberately not built):
 Annex 13/5 (no official IRD spec), Budget module + Budget vs Expense Report (module doesn't
-exist), Custom Fields/Custom Status dynamic wiring into entry forms, Barcode symbol
-rendering, Invoice Import Setting's CSV upload/parse execution. These are reasonable
-candidates for a following session under the same "continue remaining tasks" instruction.
+exist), Custom Fields dynamic wiring into entry forms, Barcode symbol rendering, Invoice
+Import Setting's CSV upload/parse execution. These are reasonable candidates for a following
+session under the same "continue remaining tasks" instruction.
 
 ### Session 19 — 2026-09-12 (The 12 remaining Settings sub-pages)
 Closed out the client's oldest still-open ask (first raised in session 17, deferred behind

@@ -227,7 +227,7 @@ from the platform foundation; only the UI (a full CRUD permission-matrix editor)
 | **`Bank`** | master bank-name list; `unique(companyId, name)` |
 | **`BankAccount`** | the company's own registered accounts; `bankId→Bank`, optional `ledgerId→Ledger` tie-in, one `isDefault` per company |
 | **`CustomField`** | UDF definitions (`module`, `label`, `fieldType`, `options?` json, `required`) — **MVP scope: definitions only**, no entry-form rendering yet |
-| **`CustomStatus`** | descriptive per-module labels (`module`, `label`, `color`) — **MVP scope: additive tags**, `SalesDoc`/`PurchaseDoc.status` stays on its fixed enum since GL posting depends on it |
+| **`CustomStatus`** | descriptive per-module labels (`module`, `label`, `color`). Session 20: `SalesDoc.customStatusId` / `PurchaseDoc.customStatusId` (nullable FK, `onDelete: SetNull`) let a specific invoice be tagged with one — editable any time via `PATCH /api/sales/invoices/[id]` / `PATCH /api/purchase/invoices/[id]`, shown/changed from a dropdown on the invoice detail page (hidden on the printed copy via `data-app-chrome`). `SalesDoc`/`PurchaseDoc.status` itself still stays on its fixed enum since GL posting depends on it — this tag is additive metadata layered alongside it, not a replacement. |
 | **`BarcodeSetting`** | singleton per company (`@unique companyId`); symbology/prefix/label size — config only, no renderer wired |
 | **`InvoiceSetting`** | singleton per company; column-visibility toggles + default terms/notes, read live by the Sales/Purchase invoice print pages built in session 17 |
 | **`InvoiceImportTemplate`** | CSV column-mapping template (`columnMap` json) — **MVP scope: mapping only**, upload/parse pipeline is a follow-on |

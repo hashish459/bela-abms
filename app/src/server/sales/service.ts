@@ -696,10 +696,34 @@ export async function getSalesDoc(companyId: string, id: string) {
       items: { orderBy: { order: "asc" } },
       receipts: { select: { number: true, date: true, amount: true } },
       fiscalYear: { select: { name: true } },
+      customStatus: { select: { id: true, label: true, color: true } },
     },
   });
   if (!d) throw errors.notFound("Document not found");
   return d;
+}
+
+/** Set/clear the doc's descriptive Custom Status tag (Settings › Custom Status). Purely
+ * additive metadata — unlike every other invoice field, editable freely after creation
+ * since it carries no GL/workflow weight. */
+export async function setSalesDocCustomStatus(
+  companyId: string,
+  actorId: string,
+  id: string,
+  customStatusId: string | null,
+) {
+  const doc = await db.salesDoc.findFirst({ where: { id, companyId }, select: { id: true } });
+  if (!doc) throw errors.notFound("Document not found");
+
+  if (customStatusId) {
+    const tag = await db.customStatus.findFirst({
+      where: { id: customStatusId, companyId, module: "SALES_INVOICE", isActive: true },
+    });
+    if (!tag) throw errors.validation(null, "Invalid status tag");
+  }
+
+  await db.salesDoc.update({ where: { id }, data: { customStatusId } });
+  await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "SalesDoc", entityId: id, meta: { customStatusId } });
 }
 
 export async function convertDoc(
