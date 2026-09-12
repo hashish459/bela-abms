@@ -1,17 +1,20 @@
-import { encodeCode128B } from "@/lib/barcode";
+import { encodeCode128B, encodeEAN13 } from "@/lib/barcode";
 
-/** Code128B barcode rendered as native SVG rects (not a raw string blob) — the
- * component both the products list and the printable label page use. */
+/** Code128B or EAN13 barcode rendered as native SVG rects (not a raw string
+ * blob) — the component both the products list and the printable label page
+ * use. */
 export function BarcodeSvg({
   value,
+  symbology = "CODE128",
   height = 60,
   showText = true,
 }: {
   value: string;
+  symbology?: string;
   height?: number;
   showText?: boolean;
 }) {
-  const widths = encodeCode128B(value);
+  const widths = symbology === "EAN13" ? encodeEAN13(value) : encodeCode128B(value);
   const quiet = 10;
   const totalModules = widths.reduce((a, w) => a + w, 0);
   const totalWidth = totalModules + quiet * 2;

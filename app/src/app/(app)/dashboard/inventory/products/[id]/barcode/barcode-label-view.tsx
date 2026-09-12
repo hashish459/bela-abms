@@ -48,24 +48,21 @@ export function BarcodeLabelView({ product, setting }: { product: Product; setti
           </p>
           <Button loading={generating} onClick={generate}>Generate barcode</Button>
         </Card>
+      ) : setting.symbology === "EAN13" && !/^\d{13}$/.test(value) ? (
+        <p className="mx-auto max-w-md text-center text-xs text-danger" data-app-chrome>
+          This product&apos;s barcode value (&quot;{value}&quot;) was generated before the setting
+          was switched to EAN13 and isn&apos;t 13 numeric digits, so it can&apos;t be rendered
+          as one. Switch Settings › Barcode back to CODE128 to print this label.
+        </p>
       ) : (
-        <>
-          {setting.symbology === "EAN13" && (
-            <p className="mx-auto mb-3 max-w-md text-center text-xs text-danger" data-app-chrome>
-              Settings › Barcode is set to EAN13, but only Code128 rendering is implemented —
-              the label below is Code128. Switch the setting to CODE128 to match, or treat
-              this as a known gap.
-            </p>
-          )}
-          <Card
-            className="mx-auto flex flex-col items-center justify-center gap-1 p-4 print:shadow-none"
-            style={{ width: `${setting.labelWidthMm}mm`, minHeight: `${setting.labelHeightMm}mm` }}
-          >
-            {setting.showName && <div className="w-full truncate text-center text-xs font-medium">{product.name}</div>}
-            <BarcodeSvg value={value} height={40} />
-            {setting.showPrice && <div className="text-xs font-semibold">Rs. {product.sellingPrice}</div>}
-          </Card>
-        </>
+        <Card
+          className="mx-auto flex flex-col items-center justify-center gap-1 p-4 print:shadow-none"
+          style={{ width: `${setting.labelWidthMm}mm`, minHeight: `${setting.labelHeightMm}mm` }}
+        >
+          {setting.showName && <div className="w-full truncate text-center text-xs font-medium">{product.name}</div>}
+          <BarcodeSvg value={value} symbology={setting.symbology} height={40} />
+          {setting.showPrice && <div className="text-xs font-semibold">Rs. {product.sellingPrice}</div>}
+        </Card>
       )}
     </>
   );

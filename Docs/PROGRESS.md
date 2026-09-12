@@ -13,6 +13,63 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 23 — 2026-09-12 (EAN13 barcode rendering — closing the second-to-last gap)
+Continued from an open-ended "continue" with no specific list, same pattern as session 20 —
+worked through the two remaining documented gaps by value, starting with the more
+self-contained one. EAN13 (`BarcodeSetting.symbology`'s other option, session 19) previously
+had no encoder at all: the label page showed an honest on-screen warning and rendered
+Code128 regardless of the setting. No schema change was needed — `symbology`/`prefix`/
+`nextNumber` already existed on `BarcodeSetting`; this was purely an encoder + generation-
+logic gap.
+
+**`src/lib/barcode.ts`** gained `encodeEAN13()` (standard GS1 L/G/R 7-module tables per
+digit + guard bars, concatenated into one 95-module bit string and run-length encoded the
+same way Code128's pattern table already was) and `ean13CheckDigit()` (mod-10 weighted-3/1
+check digit). Verified correct with a 2000-iteration round-trip fuzz test (encode every
+first-digit/parity combination across random bodies, decode back via inverse tables, confirm
+the digits match) plus the well-known real-world example `4006381333931`, which round-trips
+and check-digit-validates correctly — high confidence the tables weren't mistyped.
+`<BarcodeSvg symbology>` now picks the encoder; the sole caller
+(`barcode-label-view.tsx`) passes the setting's actual symbology through.
+
+**Key design point — reconciling free-text `prefix` with EAN13's numeric-only format.**
+`generateProductBarcode()` (`src/server/inventory/service.ts`) previously built
+`prefix + 6-digit counter` as an arbitrary alphanumeric string — fine for Code128, invalid
+for EAN13 (needs exactly 13 numeric digits). Rather than forcing the admin to reconfigure
+their prefix, the EAN13 branch keeps only the prefix's digit characters (zero-padded/
+truncated to 6), fills the remaining 6 with the counter, and appends a real computed check
+digit — same "prefix + counter" shape the setting already implies, now guaranteed valid.
+
+**Second design point — a value survives a symbology switch, but can't be re-decoded under
+the new one.** `Product.barcodeValue` has no companion field recording which symbology
+generated it, and generation is a one-time claim (no regenerate-on-demand). Switching the
+setting from CODE128 to EAN13 after values already exist means those values are no longer
+13 numeric digits — encoding them as EAN13 would throw. Rather than crash the label page,
+it now detects the mismatch (`!/^\d{13}$/.test(value)` while `symbology === "EAN13"`) and
+shows an explicit message naming the stored value and telling the admin to switch back,
+instead of silently mis-rendering or crashing.
+
+Also fixed two pieces of stale copy while touching this exact feature: the Custom Fields
+settings page still said "entry forms don't yet render these dynamically" (false since
+session 22), and the Barcode settings page still said "label printing UI is a follow-on"
+(false since session 20 built it).
+
+Verified live: switched Settings › Barcode to EAN13, generated a fresh barcode for a product
+with no prior value (prefix "BELA" has no digits, so the encoder correctly fell back to an
+all-zero prefix segment; counter 2 → value `0000000000024`, manually confirmed the check
+digit by hand), confirmed the bars render, then opened a product with a pre-existing
+Code128 value ("000001") under the EAN13 setting and confirmed the honest mismatch message
+appears instead of a crash. Switched back to CODE128 and confirmed the original Code128
+label still renders correctly (no regression). `npm run typecheck`, `npx eslint src` (one
+`react/no-unescaped-entities` fix), and a clean `rm -rf .next && npm run build` all pass.
+
+**Only one documented gap remains**: Invoice Import Setting's CSV upload/parse pipeline
+(session 19 — mapping-only, no execution). Scoped but not started this session — it's
+materially larger than EAN13 was (new dependency for CSV parsing, a resolution step from
+CSV text to real product/customer/tax-rate IDs, and design decisions for fields the mapping
+template doesn't cover at all, like payment mode and a purchase invoice's required
+supplier — unlike Sales, Purchase has no free-text customer-name fallback).
+
 ### Session 22 — 2026-09-12 (Custom Fields — dynamic form wiring)
 Client explicitly asked to continue with Custom Fields' dynamic form wiring next — the one
 documented gap left over from session 19 (`CustomField` definitions existed but were never

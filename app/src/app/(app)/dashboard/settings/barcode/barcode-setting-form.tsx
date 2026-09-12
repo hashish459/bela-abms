@@ -37,8 +37,8 @@ export function BarcodeSettingForm({ initial, canUpdate }: { initial: Setting; c
     <>
       <PageHeader crumbs={["Settings", "Barcode"]} title="Barcode" />
       <p className="mb-3 text-sm text-muted">
-        Symbology and label layout for printed product barcodes. Configuration only — label
-        printing UI is a follow-on.
+        Symbology and label layout for printed product barcodes. Generate and print a
+        product&apos;s label from its detail page under Inventory › Products.
       </p>
 
       <Card className="max-w-2xl space-y-4 p-5">

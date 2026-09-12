@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { errors } from "@/lib/api";
 import { writeAudit } from "@/lib/audit";
+import { ean13CheckDigit } from "@/lib/barcode";
 import { postStockMovement, nextNumber } from "./stock";
 import {
   getCustomFieldValuesForEntities,
@@ -387,7 +388,15 @@ export async function updateProduct(
 /** Claims the next barcode value from Settings › Barcode's prefix+counter and
  * assigns it to the product permanently (re-calling this on an already-tagged
  * product is a no-op — it returns the existing value rather than burning
- * another number). Increments BarcodeSetting.nextNumber atomically. */
+ * another number). Increments BarcodeSetting.nextNumber atomically.
+ *
+ * EAN13 needs exactly 13 numeric digits (12 data + 1 check digit), but the
+ * setting's `prefix` is free text (e.g. "BELA") meant for CODE128 labels — so
+ * for EAN13 only the prefix's digit characters are kept, packed into the
+ * first 6 digits (zero-padded/truncated) with the counter's last 6 digits
+ * filling the rest, then a real GS1 check digit is computed and appended.
+ * This keeps the same "prefix + 6-digit counter" shape the setting already
+ * implies while guaranteeing a scannable, checksum-valid EAN13 value. */
 export async function generateProductBarcode(companyId: string, actorId: string, productId: string) {
   return db.$transaction(async (tx) => {
     const product = await tx.product.findFirst({ where: { id: productId, companyId, deletedAt: null } });
@@ -399,7 +408,15 @@ export async function generateProductBarcode(companyId: string, actorId: string,
       create: { companyId },
       update: {},
     });
-    const value = `${setting.prefix ?? ""}${String(setting.nextNumber).padStart(6, "0")}`;
+    let value: string;
+    if (setting.symbology === "EAN13") {
+      const prefixDigits = (setting.prefix ?? "").replace(/\D/g, "").slice(0, 6).padStart(6, "0");
+      const counterDigits = String(setting.nextNumber % 1_000_000).padStart(6, "0");
+      const body = prefixDigits + counterDigits;
+      value = body + ean13CheckDigit(body);
+    } else {
+      value = `${setting.prefix ?? ""}${String(setting.nextNumber).padStart(6, "0")}`;
+    }
 
     const [updated] = await Promise.all([
       tx.product.update({ where: { id: productId }, data: { barcodeValue: value } }),

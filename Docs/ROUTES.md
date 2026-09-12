@@ -20,7 +20,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
 | `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module — active fields render dynamically on that module's entry form (session 22) |
 | `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
-| `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config (no renderer wired yet) |
+| `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config; both CODE128 and EAN13 (session 22) render for real |
 | `/dashboard/settings/invoice-import-setting` | A · `settings.invoice_import_setting` | Invoice Import Setting | CSV column-mapping templates (MVP — upload/parse pipeline is a follow-on) |
 | `/dashboard/settings/backup` | A · `settings.backup_data` | Backup Data | on-demand full JSON export of company data |
 | `/dashboard/settings/signin-security` | A · `settings.signin_and_security` | Signin & Security | change password (self-service, no permission gate) + active `RefreshToken` sessions with revoke |
@@ -75,7 +75,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/workshop/technician` | A · `workshop.technician` | Technician | list + add/edit form |
 | `/dashboard/inventory/product-category` | A · `inventory.product_category` | Product Category | tree + CRUD |
 | `/dashboard/inventory/products` | A · `inventory.product_item` | Products | Goods/Services/Expense tabs + Add Product; Goods rows link to a Barcode column |
-| `/dashboard/inventory/products/[id]/barcode` | A · `inventory.product_item` | Barcode Label | generate a barcode value + printable Code128 label sized per Settings › Barcode |
+| `/dashboard/inventory/products/[id]/barcode` | A · `inventory.product_item` | Barcode Label | generate a barcode value + printable label (Code128 or EAN13, per Settings › Barcode) sized per that setting |
 | `/dashboard/inventory/unit-measurement` | A · `inventory.units_of_measurement` | Units | CRUD |
 | `/dashboard/inventory/warehouse` | A · `inventory.warehouse` | Warehouse | CRUD |
 | `/dashboard/inventory/inventory-adjustment` | A · `inventory.inventory_adjustment` | Inventory Adjustment | list + entry (line grid) |
