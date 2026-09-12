@@ -1514,6 +1514,10 @@ model InvoiceSetting {
   /// pages render with. Free string, not an enum, so a template can be added without a
   /// migration — validated against TEMPLATE_OPTIONS in src/components/invoice-templates.
   template           String   @default("CLASSIC")
+  /// Same idea as `template` above, but for the Receipt detail page — a separate field
+  /// since Receipt has its own template set (src/components/receipt-templates), not a
+  /// shared one with invoices.
+  receiptTemplate    String   @default("CLASSIC")
   defaultTermsText   String?
   defaultNotes       String?
   updatedAt          DateTime @updatedAt

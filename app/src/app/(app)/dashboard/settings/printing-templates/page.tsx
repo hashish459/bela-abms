@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { getCompanyInfo, getInvoiceSetting, getBillFooterForPrint } from "@/server/settings/service";
-import { PrintingTemplatesGallery } from "./printing-templates-gallery";
+import { PrintingTemplatesTabs } from "./printing-templates-tabs";
 
 export const metadata = { title: "Printing Templates — Bela ABMS" };
 
@@ -17,8 +17,9 @@ export default async function PrintingTemplatesPage() {
   ]);
 
   return (
-    <PrintingTemplatesGallery
-      current={invoiceSetting.template}
+    <PrintingTemplatesTabs
+      invoiceTemplate={invoiceSetting.template}
+      receiptTemplate={invoiceSetting.receiptTemplate}
       company={company}
       invoiceSetting={{
         showHsCode: invoiceSetting.showHsCode,

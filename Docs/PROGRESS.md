@@ -13,6 +13,37 @@ Project now lives at **`D:\Bela_ABMS\`** (renamed from the `&`-containing path).
 
 ## Session log
 
+### Session 28 — 2026-09-12 (Receipt template selector — 3 more templates + a tab switcher)
+Direct follow-on: "add a template selector for receipts too" — the exact trigger session 27
+had named as the reason it deliberately skipped building a selector ("no template *selector*
+UI yet since there's only one option... add the Settings-page gallery entry when a second
+receipt template is actually requested"). A picker with a single choice still wouldn't be
+worth shipping, so built 3 more receipt templates first:
+
+**Modern** — navy/orange brand-accented header and an orange "Amount Received" callout band,
+matching the Modern invoice template's visual language. **Thermal Receipt** — narrow 80mm
+POS layout, dashed separators, monospace; arguably the single most practically relevant
+receipt template of the four, since a payment receipt is very often handed over at the exact
+same counter/thermal printer as a POS sales receipt. **Compact** — dense A6 voucher-book
+style with no logo, for a quick handwritten-style stub.
+
+`InvoiceSetting` gained `receiptTemplate` (same free-string-not-enum pattern as `template` —
+a 5th receipt template ships without a migration). Settings › Printing Templates is now one
+page with a two-way tab switcher ("Sales / Purchase Invoice" | "Receipt") rather than two
+separate settings pages — matches the reference app's own structure (its gallery is
+organized by document type within one screen) and reuses the exact same live-scaled-preview
+card layout, "Preview" full-size modal, and instant-apply-on-select UX already proven for
+invoices, just pointed at `RECEIPT_TEMPLATE_OPTIONS` and a new `PUT
+/api/settings/receipt-template` route. The session-27 Receipt detail page now reads
+`invoiceSetting.receiptTemplate` instead of the hardcoded `DEFAULT_RECEIPT_TEMPLATE` constant
+it shipped with.
+
+Verified live: all 4 receipt templates render correctly in the new "Receipt" tab against
+real company data; selected Thermal Receipt and confirmed a real receipt's detail page
+switched to it immediately with correct data; reset both the invoice and receipt selections
+back to Classic afterward. `npm run typecheck`, `npx eslint src` (clean on the first pass),
+and a clean `rm -rf .next && npm run build` all pass.
+
 ### Session 27 — 2026-09-12 (Receipt printing template — a document type that had none)
 Direct follow-on: "add a receipt printing template too." Unlike Sales/Purchase Invoice,
 Receipts had **no detail page or print capability at all** before this session — list rows

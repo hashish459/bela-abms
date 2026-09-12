@@ -241,7 +241,7 @@ toggling "Show HS Code column" off in Settings immediately changes what prints o
 invoice. Purchase invoices intentionally never print the company's own bank details (a
 payable, not a receivable) even though the setting is shared.
 
-### Printing Templates — ✅ BUILT (session 25, extended session 26)
+### Printing Templates — ✅ BUILT (session 25, extended sessions 26-28)
 Client asked to clone the reference app's Settings › Printing Templates gallery
 (`bela.nepalebilling.com/dashboard/settings/printing-templates`), which offers ~40 near-
 duplicate layout variations per document type. Deliberately built distinct, professionally
@@ -285,6 +285,22 @@ session 25's shape with zero structural changes. No template *selector* UI yet s
 only one option — matches the project's own "don't build a picker for a choice that doesn't
 exist yet" convention; add the Settings-page gallery entry when a second receipt template is
 actually requested.
+
+**Session 28 — that Receipt selector, requested one message later.** Client immediately
+asked for "a template selector for receipts too" — the exact trigger session 27 named for
+building it. A single-option picker still wouldn't have been worth building, so this session
+first added 3 more receipt templates (**Modern** — navy/orange brand-accented header and
+callout band, matching the Modern invoice; **Thermal Receipt** — narrow 80mm POS layout,
+arguably the most practically relevant of the four since a payment receipt is often handed
+over at the same counter/printer as a thermal sales receipt; **Compact** — dense A6
+voucher-book style, no logo) before building the selector, so it would have real choices.
+`InvoiceSetting` gained `receiptTemplate` (same free-string-not-enum pattern as `template`).
+Settings › Printing Templates is now a single page with a two-way tab switcher
+(`printing-templates-tabs.tsx`) — "Sales / Purchase Invoice" (the existing gallery,
+`PageHeader` hoisted up to the shared tab wrapper) and "Receipt" (`ReceiptTemplatesGallery`,
+new — identical live-scaled-preview/Preview-modal/instant-apply UX as the invoice gallery,
+PUTing `/api/settings/receipt-template`). The Receipt detail page (session 27) now reads
+`invoiceSetting.receiptTemplate` instead of a hardcoded `DEFAULT_RECEIPT_TEMPLATE` constant.
 
 Each template is a self-contained component in `src/components/invoice-templates/` sharing
 one `InvoiceTemplateData` type (a superset covering both invoice types — `partyLabel`/

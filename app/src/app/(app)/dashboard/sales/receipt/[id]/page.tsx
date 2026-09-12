@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { getReceipt } from "@/server/sales/service";
-import { getCompanyInfo, getBillFooterForPrint } from "@/server/settings/service";
+import { getCompanyInfo, getBillFooterForPrint, getInvoiceSetting } from "@/server/settings/service";
 import { adToBs } from "@/lib/bs-date";
 import { ReceiptDetailView } from "./receipt-detail-view";
 
@@ -17,10 +17,11 @@ export default async function ReceiptDetailPage({
   if (!can(s.permissions, "sales.receipt", "read")) redirect("/dashboard");
 
   const { id } = await params;
-  const [receipt, company, billFooter] = await Promise.all([
+  const [receipt, company, billFooter, invoiceSetting] = await Promise.all([
     getReceipt(s.companyId!, id).catch(() => null),
     getCompanyInfo(s.companyId!),
     getBillFooterForPrint(s.companyId!),
+    getInvoiceSetting(s.companyId!),
   ]);
   if (!receipt) notFound();
 
@@ -28,6 +29,7 @@ export default async function ReceiptDetailPage({
 
   return (
     <ReceiptDetailView
+      template={invoiceSetting.receiptTemplate}
       data={{
         number: receipt.number,
         date: `${dateStr} (BS ${adToBs(dateStr)})`,

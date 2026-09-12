@@ -18,7 +18,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/settings/bank-detail` | A · `settings.bank_detail` | Bank Detail | company's own bank accounts; default one feeds Bill Footer |
 | `/dashboard/settings/bill-footer` | A · `settings.bill_footer` | Bill Footer | terms, bank account, signatory, note — printed on Sales/Purchase invoice detail+print pages |
 | `/dashboard/settings/invoice-setting` | A · `settings.invoice_setting` | Invoice Setting | show/hide HS Code, Discount, bank details, QR toggles (read by the print pages); default terms/notes |
-| `/dashboard/settings/printing-templates` | A · `settings.printing_templates` | Printing Templates | gallery of 8 live-rendered print layouts for Sales/Purchase Invoice (session 25, +3 manufacturing/construction-themed in session 26) — new permission module, not previously seeded |
+| `/dashboard/settings/printing-templates` | A · `settings.printing_templates` | Printing Templates | tab-switched gallery (session 28): 8 layouts for Sales/Purchase Invoice (session 25, +3 manufacturing/construction-themed session 26) and 4 for Receipt (session 28) — new permission module, not previously seeded |
 | `/dashboard/settings/custom-fields` | A · `settings.custom_fields` | Custom Fields | UDF definitions per module — active fields render dynamically on that module's entry form (session 22) |
 | `/dashboard/settings/custom-status` | A · `settings.custom_status` | Custom Status | descriptive per-module labels (MVP — SalesDoc/PurchaseDoc.status stays on its GL-driving enum) |
 | `/dashboard/settings/barcode` | A · `settings.barcode` | Barcode | symbology/prefix/label-size config; both CODE128 and EAN13 (session 22) render for real |
@@ -92,7 +92,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | `/dashboard/sales/quotation` | A · `sales.quotation` | Quotation | list + form + convert |
 | `/dashboard/sales/sales-order` | A · `sales.sales_order` | Sales Order | list + form + convert |
 | `/dashboard/sales/receipt` | A · `sales.receipt` | Receipts | list + payment form (against invoice); rows now click through to detail (session 27) |
-| `/dashboard/sales/receipt/[id]` | A · `sales.receipt` read | Receipt detail | printable payment receipt (session 27) — the app's first Receipt detail/print page, no dedicated API route (fetched server-side via `getReceipt()`) |
+| `/dashboard/sales/receipt/[id]` | A · `sales.receipt` read | Receipt detail | printable payment receipt (session 27) — the app's first Receipt detail/print page, no dedicated API route (fetched server-side via `getReceipt()`); renders via the selected Settings › Printing Templates › Receipt layout (session 28) |
 | `/dashboard/sales/credit-note` | A · `sales.credit_note` | Credit Note | list + return form (pick invoice) |
 | `/dashboard/sales/proforma-invoice` | A · `sales.proforma_invoice` | Proforma Invoice | list + form + convert (session 24) — reuses `SalesDoc`/`<DraftWorkspace>` exactly like Quotation, no new model |
 | `/dashboard/sales/chalani` | A · `sales.chalani` | Chalani | dispatch/delivery register (session 24) — paperwork only, no GL/stock; optional link to a Sales Invoice |
@@ -145,6 +145,7 @@ Envelope: `{ ok:true, data }` / `{ ok:false, error:{ code, message, details? } }
 | GET/PUT | `/api/settings/barcode` | A · `settings.barcode` view/update | singleton `BarcodeSetting` |
 | GET/PUT | `/api/settings/invoice-setting` | A · `settings.invoice_setting` view/update | singleton `InvoiceSetting`, read by the invoice print pages |
 | GET/PUT | `/api/settings/printing-template` | A · `settings.printing_templates` view/update | `InvoiceSetting.template` only (session 25) — applies immediately, no separate publish step |
+| GET/PUT | `/api/settings/receipt-template` | A · `settings.printing_templates` view/update | `InvoiceSetting.receiptTemplate` only (session 28) — same instant-apply behavior as the invoice template route |
 | GET/POST | `/api/settings/invoice-import-templates` | A · `settings.invoice_import_setting` view/create | CSV column-mapping templates |
 | PATCH/DELETE | `/api/settings/invoice-import-templates/[id]` | A · `settings.invoice_import_setting` update/delete | |
 | GET/PUT | `/api/settings/bill-footer` | A · `settings.bill_footer` view/update | singleton `BillFooterSetting`, read by the invoice print pages |

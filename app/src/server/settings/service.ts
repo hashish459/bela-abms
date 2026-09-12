@@ -27,6 +27,7 @@ import type {
   BarcodeSettingUpdate,
   InvoiceSettingUpdate,
   PrintingTemplateUpdate,
+  ReceiptTemplateUpdate,
   InvoiceImportTemplateCreate,
   InvoiceImportTemplateUpdate,
   BillFooterUpdate,
@@ -683,7 +684,8 @@ export async function getInvoiceSetting(companyId: string) {
   return (
     row ?? {
       companyId, showHsCode: true, showDiscountColumn: true, showBankDetails: true,
-      showQrCode: true, template: "CLASSIC", defaultTermsText: null, defaultNotes: null,
+      showQrCode: true, template: "CLASSIC", receiptTemplate: "CLASSIC",
+      defaultTermsText: null, defaultNotes: null,
     }
   );
 }
@@ -708,6 +710,18 @@ export async function updatePrintingTemplate(companyId: string, actorId: string,
     update: { template: input.template },
   });
   await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "InvoiceSetting", entityId: saved.id, meta: { template: input.template } });
+  return saved;
+}
+
+/** Settings › Printing Templates (Receipt tab) — a single active template
+ * selection for the Receipt print page (src/components/receipt-templates). */
+export async function updateReceiptTemplate(companyId: string, actorId: string, input: ReceiptTemplateUpdate) {
+  const saved = await db.invoiceSetting.upsert({
+    where: { companyId },
+    create: { companyId, receiptTemplate: input.receiptTemplate },
+    update: { receiptTemplate: input.receiptTemplate },
+  });
+  await writeAudit({ userId: actorId, companyId, action: "UPDATE", entity: "InvoiceSetting", entityId: saved.id, meta: { receiptTemplate: input.receiptTemplate } });
   return saved;
 }
 

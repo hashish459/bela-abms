@@ -22,6 +22,9 @@ export type ReceiptTemplateData = {
 
 export const RECEIPT_TEMPLATE_OPTIONS = [
   { id: "CLASSIC", label: "Classic", size: "A5 Landscape", description: "Clean formal payment receipt — the safe, universal default." },
+  { id: "MODERN", label: "Modern", size: "A5 Landscape", description: "Navy/orange brand-accented header and callout band, on-brand." },
+  { id: "THERMAL", label: "Thermal Receipt", size: "80mm", description: "Narrow receipt-printer layout — the most common way a receipt is actually handed over." },
+  { id: "COMPACT", label: "Compact", size: "A6", description: "Dense voucher-book-style layout, no logo, minimal spacing." },
 ] as const;
 
 export type ReceiptTemplateId = (typeof RECEIPT_TEMPLATE_OPTIONS)[number]["id"];
