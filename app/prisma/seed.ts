@@ -325,10 +325,40 @@ async function seedMenu() {
   await walk(MENU, null);
 }
 
+/** Every value here can be overridden by an env var of the same-named
+ * `SEED_*` key (see automation/db-fresh.sh) so a real VPS deployment seeds
+ * an actual client's company identity instead of the demo one — the
+ * defaults below (and the whole shape of what gets seeded: NFRS chart of
+ * accounts, permission modules, menu tree, an Administrator role) are
+ * unchanged either way. This is the "company philosophy" scaffold: no
+ * transactions, just the blank ledger structure and RBAC every company
+ * needs on day one. */
+const cfg = {
+  subdomain: process.env.SEED_COMPANY_SUBDOMAIN ?? "bela",
+  companyName: process.env.SEED_COMPANY_NAME ?? "Bela Nepal (Demo)",
+  companyAddress: process.env.SEED_COMPANY_ADDRESS ?? "Kathmandu, Nepal",
+  legalName: process.env.SEED_LEGAL_NAME ?? "Bela Nepal Industries (Demo)",
+  displayName: process.env.SEED_DISPLAY_NAME ?? "Bela Nepal Industries",
+  phone: process.env.SEED_COMPANY_PHONE ?? "9800000000",
+  email: process.env.SEED_COMPANY_EMAIL ?? "info@bela.local",
+  website: process.env.SEED_COMPANY_WEBSITE ?? "https://belanepal.com.np",
+  panNumber: process.env.SEED_COMPANY_PAN ?? "600000000",
+  registeredAddress: process.env.SEED_REGISTERED_ADDRESS ?? "Chhauni-15, Kathmandu, Nepal",
+  adminEmail: process.env.SEED_ADMIN_EMAIL ?? "admin@bela.local",
+  adminPassword: process.env.SEED_ADMIN_PASSWORD ?? "password123",
+  adminFirstName: process.env.SEED_ADMIN_FIRST_NAME ?? "Demo",
+  adminLastName: process.env.SEED_ADMIN_LAST_NAME ?? "Admin",
+  adminPhone: process.env.SEED_ADMIN_PHONE ?? "9800000000",
+  // Set SEED_SKIP_DEMO_USERS=1 for a real deployment — skips the second
+  // "cashier@bela.local / password123" login; the Cashier ROLE (a useful
+  // limited-permission template) is still created either way.
+  skipDemoUsers: process.env.SEED_SKIP_DEMO_USERS === "1",
+};
+
 async function seedDemoCompany(allPermKeys: string[]) {
   const company = await db.company.upsert({
-    where: { subdomain: "bela" },
-    create: { name: "Bela Nepal (Demo)", subdomain: "bela", address: "Kathmandu, Nepal" },
+    where: { subdomain: cfg.subdomain },
+    create: { name: cfg.companyName, subdomain: cfg.subdomain, address: cfg.companyAddress },
     update: {},
   });
 
@@ -377,16 +407,16 @@ async function seedDemoCompany(allPermKeys: string[]) {
     where: { companyId: company.id },
     create: {
       companyId: company.id,
-      legalName: "Bela Nepal Industries (Demo)",
-      displayName: "Bela Nepal Industries",
-      phone: "9800000000",
-      email: "info@bela.local",
-      website: "https://belanepal.com.np",
-      panNumber: "600000000",
+      legalName: cfg.legalName,
+      displayName: cfg.displayName,
+      phone: cfg.phone,
+      email: cfg.email,
+      website: cfg.website,
+      panNumber: cfg.panNumber,
       registeredWithVat: true,
       separatePurchaseSalesTax: false,
       syncWithIrd: false,
-      registeredAddress: "Chhauni-15, Kathmandu, Nepal",
+      registeredAddress: cfg.registeredAddress,
     },
     update: {},
   });
@@ -445,26 +475,39 @@ async function seedDemoCompany(allPermKeys: string[]) {
     });
   }
 
-  // Demo users (password: "password123") — dev only.
-  const passwordHash = await bcrypt.hash("password123", 12);
+  const adminPasswordHash = await bcrypt.hash(cfg.adminPassword, 12);
   const admin = await db.user.upsert({
-    where: { email: "admin@bela.local" },
+    where: { email: cfg.adminEmail },
     create: {
-      email: "admin@bela.local", firstName: "Demo", lastName: "Admin",
-      phone: "9800000000", passwordHash, userType: "ADMIN", status: "ACTIVE",
+      email: cfg.adminEmail, firstName: cfg.adminFirstName, lastName: cfg.adminLastName,
+      phone: cfg.adminPhone, passwordHash: adminPasswordHash, userType: "ADMIN", status: "ACTIVE",
     },
-    update: { passwordHash, userType: "ADMIN" },
-  });
-  const cashier = await db.user.upsert({
-    where: { email: "cashier@bela.local" },
-    create: {
-      email: "cashier@bela.local", firstName: "Demo", lastName: "Cashier",
-      phone: "9800000001", passwordHash, userType: "STAFF", status: "ACTIVE",
-    },
-    update: { passwordHash, userType: "STAFF" },
+    update: { passwordHash: adminPasswordHash, userType: "ADMIN" },
   });
 
-  for (const u of [admin, cashier]) {
+  // The second demo login ("cashier@bela.local / password123") is dev-only —
+  // skip it for a real deployment via SEED_SKIP_DEMO_USERS=1. The Cashier
+  // ROLE itself (a useful limited-permission template) is always created.
+  const users = [admin];
+  if (!cfg.skipDemoUsers) {
+    const cashierPasswordHash = await bcrypt.hash("password123", 12);
+    const cashier = await db.user.upsert({
+      where: { email: "cashier@bela.local" },
+      create: {
+        email: "cashier@bela.local", firstName: "Demo", lastName: "Cashier",
+        phone: "9800000001", passwordHash: cashierPasswordHash, userType: "STAFF", status: "ACTIVE",
+      },
+      update: { passwordHash: cashierPasswordHash, userType: "STAFF" },
+    });
+    users.push(cashier);
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: cashier.id, roleId: cashierRole.id } },
+      create: { userId: cashier.id, roleId: cashierRole.id },
+      update: {},
+    });
+  }
+
+  for (const u of users) {
     await db.userCompany.upsert({
       where: { userId_companyId: { userId: u.id, companyId: company.id } },
       create: { userId: u.id, companyId: company.id, isDefault: true },
@@ -474,11 +517,6 @@ async function seedDemoCompany(allPermKeys: string[]) {
   await db.userRole.upsert({
     where: { userId_roleId: { userId: admin.id, roleId: adminRole.id } },
     create: { userId: admin.id, roleId: adminRole.id },
-    update: {},
-  });
-  await db.userRole.upsert({
-    where: { userId_roleId: { userId: cashier.id, roleId: cashierRole.id } },
-    create: { userId: cashier.id, roleId: cashierRole.id },
     update: {},
   });
 
@@ -605,7 +643,11 @@ async function main() {
     `NFRS chart of accounts: ${demo.coa.heads} heads, ${demo.coa.groups} groups, ${demo.coa.ledgers} ledgers.`,
   );
   console.log(`Inventory: ${demo.inv.units} units + Default Warehouse.`);
-  console.log("Demo logins (dev only): admin@bela.local / cashier@bela.local — password123");
+  if (cfg.skipDemoUsers) {
+    console.log(`Admin login: ${cfg.adminEmail} (password set via SEED_ADMIN_PASSWORD)`);
+  } else {
+    console.log(`Demo logins (dev only): ${cfg.adminEmail} / cashier@bela.local — ${cfg.adminPassword}`);
+  }
 }
 
 main()
